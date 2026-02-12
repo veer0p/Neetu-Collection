@@ -6,6 +6,7 @@ import { GlassCard } from '../components/GlassCard';
 import { BentoGrid, BentoItem } from '../components/BentoGrid';
 import { useTransactions } from '../hooks/useTransactions';
 import { Package, Users, ArrowUpCircle, ArrowDownCircle, TrendingUp, Wallet } from 'lucide-react-native';
+import { cn } from '../utils/cn';
 
 export default function Reports() {
     const { transactions, stats } = useTransactions();
@@ -46,15 +47,14 @@ export default function Reports() {
 
     return (
         <Background>
-            <SafeAreaView className="flex-1" edges={['top']}>
+            <View className="flex-1">
                 <ScrollView
                     className="flex-1"
                     contentContainerStyle={{ paddingBottom: 120 }}
                     showsVerticalScrollIndicator={false}
                 >
-                    <View className="px-6 py-4">
-                        <Text className="text-white font-sans-bold text-2xl">Business Insights</Text>
-                        <Text className="text-gray-400 font-sans text-sm mt-1">Unified performance analytics</Text>
+                    <View className="px-6 py-2">
+                        <Text className="text-gray-400 font-sans text-sm">Unified performance analytics</Text>
                     </View>
 
                     {/* Financial Summary */}
@@ -177,11 +177,9 @@ export default function Reports() {
                         </GlassCard>
                     </View>
                 </ScrollView>
-            </SafeAreaView>
+            </View>
         </Background>
     );
 }
 
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
-}
+

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { cn } from '../utils/cn';
 import { Background } from '../components/Background';
 import { GlassCard } from '../components/GlassCard';
 import { useTransactions } from '../hooks/useTransactions';
@@ -29,50 +30,49 @@ export default function Transactions() {
         return matchesSearch && matchesStatus;
     });
 
+    const renderHeader = () => (
+        <View className="py-4">
+            {/* Search Bar */}
+            <View className="flex-row items-center bg-white/10 border border-white/20 rounded-2xl px-4 py-3 mt-2">
+                <Search size={20} color="#94a3b8" />
+                <TextInput
+                    placeholder="Search customer, vendor, product..."
+                    placeholderTextColor="#64748b"
+                    className="flex-1 ml-3 text-white font-sans"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+
+            {/* Filters */}
+            <View className="flex-row flex-wrap gap-2 mt-4">
+                {['All', 'Customer Udhar', 'Vendor Udhar', 'All Paid'].map((s) => (
+                    <TouchableOpacity
+                        key={s}
+                        onPress={() => setStatusFilter(s as StatusFilter)}
+                        className={cn(
+                            "px-4 py-2 rounded-xl border",
+                            statusFilter === s ? "bg-indigo-500 border-indigo-400" : "bg-white/10 border-white/20"
+                        )}
+                    >
+                        <Text className={cn(
+                            "font-sans-medium text-[10px]",
+                            statusFilter === s ? "text-white" : "text-gray-400"
+                        )}>{s}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+        </View>
+    );
+
     return (
         <Background>
-            <SafeAreaView className="flex-1" edges={['top']}>
-                <View className="px-6 py-4">
-                    <Text className="text-white font-sans-bold text-2xl">Sales History</Text>
-
-                    {/* Search Bar */}
-                    <View className="flex-row items-center bg-white/10 border border-white/20 rounded-2xl px-4 py-3 mt-4">
-                        <Search size={20} color="#94a3b8" />
-                        <TextInput
-                            placeholder="Search customer, vendor, product..."
-                            placeholderTextColor="#64748b"
-                            className="flex-1 ml-3 text-white font-sans"
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                        />
-                    </View>
-
-                    {/* Filters */}
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mt-4 -mx-1">
-                        <View className="flex-row items-center px-1">
-                            {['All', 'Customer Udhar', 'Vendor Udhar', 'All Paid'].map((s) => (
-                                <TouchableOpacity
-                                    key={s}
-                                    onPress={() => setStatusFilter(s as StatusFilter)}
-                                    className={cn(
-                                        "px-4 py-2 rounded-xl mr-2 border",
-                                        statusFilter === s ? "bg-indigo-500 border-indigo-400" : "bg-white/10 border-white/20"
-                                    )}
-                                >
-                                    <Text className={cn(
-                                        "font-sans-medium text-xs",
-                                        statusFilter === s ? "text-white" : "text-gray-400"
-                                    )}>{s}</Text>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </ScrollView>
-                </View>
-
+            <View className="flex-1">
                 <FlatList
                     data={filteredTransactions}
                     keyExtractor={(item) => item.id}
-                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120, paddingTop: 10 }}
+                    ListHeaderComponent={renderHeader}
+                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
                     onRefresh={refresh}
                     refreshing={loading}
                     ListEmptyComponent={
@@ -81,7 +81,7 @@ export default function Transactions() {
                         </View>
                     }
                     renderItem={({ item }) => (
-                        <GlassCard className="mb-4">
+                        <GlassCard className="mb-4" blur={false}>
                             <View className="flex-row justify-between items-start mb-3">
                                 <View className="flex-1 mr-4">
                                     <View className="flex-row items-center mb-1">
@@ -145,11 +145,9 @@ export default function Transactions() {
                         </GlassCard>
                     )}
                 />
-            </SafeAreaView>
+            </View>
         </Background>
     );
 }
 
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
-}
+

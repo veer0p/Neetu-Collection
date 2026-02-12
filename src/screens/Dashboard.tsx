@@ -5,9 +5,10 @@ import { Background } from '../components/Background';
 import { GlassCard } from '../components/GlassCard';
 import { BentoGrid, BentoItem } from '../components/BentoGrid';
 import { useTransactions } from '../hooks/useTransactions';
-import { IndianRupee, ShoppingBag, CreditCard, TrendingUp, Database, ArrowUpCircle, ArrowDownCircle, Wallet, ShoppingCart, LogOut } from 'lucide-react-native';
+import { IndianRupee, ShoppingBag, CreditCard, TrendingUp, Database, ArrowUpCircle, ArrowDownCircle, Wallet, ShoppingCart, LogOut, Menu } from 'lucide-react-native';
 import { seedDummyData } from '../utils/seed';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { cn } from '../utils/cn';
 
 export default function Dashboard({ onLogout, user, ...props }: { onLogout: () => void, user: any } & any) {
     const { stats, loading, refresh, transactions, userId } = useTransactions();
@@ -23,7 +24,7 @@ export default function Dashboard({ onLogout, user, ...props }: { onLogout: () =
 
     return (
         <Background>
-            <SafeAreaView className="flex-1" edges={['top']}>
+            <View className="flex-1">
                 <ScrollView
                     className="flex-1"
                     contentContainerStyle={{ paddingBottom: 100 }}
@@ -31,26 +32,9 @@ export default function Dashboard({ onLogout, user, ...props }: { onLogout: () =
                         <RefreshControl refreshing={loading} onRefresh={refresh} tintColor="#6366f1" />
                     }
                 >
-                    <View className="px-6 py-4 flex-row justify-between items-center">
-                        <View>
-                            <Text className="text-gray-400 font-sans text-sm">Welcome back,</Text>
-                            <Text className="text-white font-sans-bold text-2xl">{user?.name || 'Neetu Collection'}</Text>
-                        </View>
-                        <View className="flex-row items-center gap-3">
-                            <TouchableOpacity
-                                onPress={() => setSeedDialogVisible(true)}
-                                className="bg-white/10 p-3 rounded-2xl border border-white/20"
-                            >
-                                <Database color="#94a3b8" size={20} />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={handleLogout}
-                                className="bg-red-500/10 p-3 rounded-2xl border border-red-500/20"
-                            >
-                                <LogOut color="#f87171" size={20} />
-                            </TouchableOpacity>
-                        </View>
+                    <View className="pt-2 px-6">
+                        <Text className="text-gray-400 font-sans text-sm">Welcome back,</Text>
+                        <Text className="text-white font-sans-bold text-2xl">{user?.name || 'User'}</Text>
                     </View>
 
                     {/* Bento Stats */}
@@ -158,7 +142,7 @@ export default function Dashboard({ onLogout, user, ...props }: { onLogout: () =
                         )}
                     </View>
                 </ScrollView>
-            </SafeAreaView>
+            </View>
 
             <ConfirmDialog
                 visible={seedDialogVisible}
@@ -199,8 +183,4 @@ export default function Dashboard({ onLogout, user, ...props }: { onLogout: () =
             />
         </Background>
     );
-}
-
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
 }

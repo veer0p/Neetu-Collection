@@ -32,12 +32,9 @@ export const Background = ({ children }: { children: React.ReactNode }) => {
                     }}
                 />
             </View>
-            <LinearGradient
-                colors={['transparent', 'rgba(15, 23, 42, 0.9)']}
-                className="flex-1"
-            >
+            <View className="flex-1">
                 {children}
-            </LinearGradient>
+            </View>
         </View>
     );
 };

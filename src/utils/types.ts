@@ -10,8 +10,48 @@ export interface Transaction {
     marginPercentage: number;
     vendorPaymentStatus: 'Paid' | 'Udhar'; // Your payment to vendor
     customerPaymentStatus: 'Paid' | 'Udhar'; // Customer's payment to you
+    pickupPaymentStatus?: 'Paid' | 'Udhar'; // Your payment to pickup person
+    paidByDriver?: boolean;
+    pickupPersonId?: string;
+    pickupPersonName?: string;
     trackingId?: string;
     courierName?: string;
+    notes?: string;
+    createdAt: number;
+}
+
+export interface Order {
+    id: string;
+    userId: string;
+    date: string;
+    productId: string;
+    productName: string;
+    customerId: string;
+    customerName: string;
+    vendorId: string;
+    vendorName: string;
+    originalPrice: number;
+    sellingPrice: number;
+    margin: number;
+    paidByDriver: boolean;
+    pickupPersonId?: string;
+    pickupPersonName?: string;
+    trackingId?: string;
+    courierName?: string;
+    notes?: string;
+    vendorPaymentStatus?: 'Paid' | 'Udhar';
+    customerPaymentStatus?: 'Paid' | 'Udhar';
+    pickupPaymentStatus?: 'Paid' | 'Udhar';
+    createdAt: number;
+}
+
+export interface LedgerEntry {
+    id: string;
+    userId: string;
+    orderId?: string;
+    personId: string;
+    amount: number; // Positive = Credit (owing/received), Negative = Debit (owed/paid)
+    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Reimbursement';
     notes?: string;
     createdAt: number;
 }
@@ -19,9 +59,13 @@ export interface Transaction {
 export interface DirectoryItem {
     id: string;
     name: string;
-    type: 'Vendor' | 'Customer';
+    type: 'Vendor' | 'Customer' | 'Product' | 'Pickup Person';
     address?: string;
     phone?: string;
+    balance?: number;
+    totalSales?: number;
+    totalPurchases?: number;
+    lastTransactionDate?: number;
     createdAt: number;
 }
 

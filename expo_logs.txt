@@ -1,0 +1,9 @@
+env: load .env
+env: export Project_URL Publishable_Key Anon_Key service_role anon_public
+Starting project at /home/veer/Documents/Projects/Neetu Collection
+› Port 8081 is running this app in another window
+  /home/veer/Documents/Projects/Neetu Collection (pid 44269)
+Input is required, but 'npx expo' is in non-interactive mode.
+Required input:
+> Use port 8082 instead?
+› Skipping dev server

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Transaction } from '../utils/types';
+import { Transaction, Order, DirectoryItem } from '../utils/types';
 import { supabaseService } from '../store/supabaseService';
 
 export const useTransactions = () => {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [accounts, setAccounts] = useState<DirectoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState<string | null>(null);
 
-    const fetchTransactions = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         let currentUserId = userId;
         if (!currentUserId) {
             const user = await supabaseService.getCurrentUser();
@@ -20,56 +21,46 @@ export const useTransactions = () => {
         }
 
         setLoading(true);
-        const data = await supabaseService.getTransactions(currentUserId as string);
-        setTransactions(data);
+        const [ordersData, accountsData] = await Promise.all([
+            supabaseService.getOrders(currentUserId as string),
+            supabaseService.getDirectoryWithBalances(currentUserId as string)
+        ]);
+        setOrders(ordersData);
+        setAccounts(accountsData);
         setLoading(false);
     }, [userId]);
 
     useEffect(() => {
-        fetchTransactions();
-    }, [fetchTransactions]);
-
-    const addTransaction = async (transaction: Transaction) => {
-        if (!userId) return;
-        await supabaseService.addTransaction(transaction, userId);
-        await fetchTransactions();
-    };
-
-    const updatePaymentStatus = async (id: string, target: 'vendor' | 'customer', status: 'Paid' | 'Udhar') => {
-        await supabaseService.updateTransaction(id, target, status);
-        await fetchTransactions();
-    };
+        fetchData();
+    }, [fetchData]);
 
     const stats = {
-        totalRevenue: transactions.reduce((acc, t) => acc + t.sellingPrice, 0),
-        totalProfit: transactions.reduce((acc, t) => acc + t.margin, 0),
-        totalPurchaseCosts: transactions.reduce((acc, t) => acc + t.originalPrice, 0),
+        totalRevenue: orders.reduce((acc, t) => acc + t.sellingPrice, 0),
+        totalProfit: orders.reduce((acc, t) => acc + t.margin, 0),
 
-        // Receivables (Customer owes you)
-        receivableUdhar: transactions
-            .filter(t => t.customerPaymentStatus === 'Udhar')
-            .reduce((acc, t) => acc + t.sellingPrice, 0),
-        receivableCount: transactions.filter(t => t.customerPaymentStatus === 'Udhar').length,
+        // Receivables (Positive balance)
+        receivableUdhar: accounts
+            .filter(a => a.balance && a.balance > 0)
+            .reduce((acc, a) => acc + (a.balance || 0), 0),
+        receivableCount: accounts.filter(a => a.balance && a.balance > 0).length,
 
-        // Payables (You owe vendor)
-        payableUdhar: transactions
-            .filter(t => t.vendorPaymentStatus === 'Udhar')
-            .reduce((acc, t) => acc + t.originalPrice, 0),
-        payableCount: transactions.filter(t => t.vendorPaymentStatus === 'Udhar').length,
+        // Payables (Negative balance)
+        payableUdhar: Math.abs(accounts
+            .filter(a => a.balance && a.balance < 0)
+            .reduce((acc, a) => acc + (a.balance || 0), 0)),
+        payableCount: accounts.filter(a => a.balance && a.balance < 0).length,
 
-        netCashPosition: 0,
-        totalOrders: transactions.length,
+        netCashPosition: accounts.reduce((acc, a) => acc + (a.balance || 0), 0),
+        totalOrders: orders.length,
     };
 
-    stats.netCashPosition = stats.receivableUdhar - stats.payableUdhar;
-
     return {
-        transactions,
+        transactions: orders as any, // Cast for legacy component compatibility
+        orders,
+        accounts,
         loading,
         userId,
         stats,
-        addTransaction,
-        updatePaymentStatus,
-        refresh: fetchTransactions,
+        refresh: fetchData,
     };
 };

@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabase';
-import { Transaction, DirectoryItem } from '../utils/types';
+import { Transaction, DirectoryItem, Order, LedgerEntry } from '../utils/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SESSION_KEY = '@neetu_collection_user_session';
@@ -47,72 +47,202 @@ export const supabaseService = {
         await AsyncStorage.removeItem(SESSION_KEY);
     },
 
-    // --- Transactions ---
-    async getTransactions(userId: string): Promise<Transaction[]> {
+    // --- Orders & Ledger (v2) ---
+    async getOrders(userId: string): Promise<Order[]> {
         const { data, error } = await supabase
-            .from('transactions')
-            .select('*')
+            .from('orders')
+            .select(`
+                *,
+                product:product_id(name),
+                customer:customer_id(name),
+                vendor:vendor_id(name),
+                pickup_person:pickup_person_id(name)
+            `)
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (error) {
-            console.error('Error fetching transactions:', error);
+            console.error('Error fetching orders:', error);
             return [];
         }
 
         return (data || []).map(item => ({
-            ...item,
+            id: item.id,
+            userId: item.user_id,
+            date: item.date,
+            productId: item.product_id,
+            productName: item.product?.name || 'Unknown',
+            customerId: item.customer_id,
+            customerName: item.customer?.name || 'Unknown',
+            vendorId: item.vendor_id,
+            vendorName: item.vendor?.name || 'Unknown',
             originalPrice: Number(item.original_price),
             sellingPrice: Number(item.selling_price),
             margin: Number(item.margin),
-            marginPercentage: Number(item.margin_percentage),
-            vendorPaymentStatus: item.vendor_payment_status,
-            customerPaymentStatus: item.customer_payment_status,
-            customerName: item.customer_name,
-            vendorName: item.vendor_name,
-            productName: item.product_name,
+            paidByDriver: item.paid_by_driver,
+            pickupPersonId: item.pickup_person_id,
+            pickupPersonName: item.pickup_person?.name,
             trackingId: item.tracking_id,
             courierName: item.courier_name,
-        })) as Transaction[];
+            notes: item.notes,
+            createdAt: new Date(item.created_at).getTime(),
+        })) as Order[];
     },
 
-    async addTransaction(transaction: Transaction, userId: string): Promise<void> {
-        const payload = {
+    async saveOrder(order: Partial<Order>, userId: string): Promise<void> {
+        // 1. Insert/Update Order
+        const isUpdate = !!order.id;
+        const orderPayload = {
             user_id: userId,
-            date: transaction.date,
-            customer_name: transaction.customerName,
-            vendor_name: transaction.vendorName,
-            product_name: transaction.productName,
-            original_price: transaction.originalPrice,
-            selling_price: transaction.sellingPrice,
-            vendor_payment_status: transaction.vendorPaymentStatus,
-            customer_payment_status: transaction.customerPaymentStatus,
-            tracking_id: transaction.trackingId,
-            courier_name: transaction.courierName,
-            notes: transaction.notes,
+            date: order.date,
+            product_id: order.productId,
+            customer_id: order.customerId,
+            vendor_id: order.vendorId,
+            original_price: order.originalPrice,
+            selling_price: order.sellingPrice,
+            paid_by_driver: order.paidByDriver || false,
+            pickup_person_id: order.pickupPersonId,
+            tracking_id: order.trackingId,
+            courier_name: order.courierName,
+            notes: order.notes,
         };
 
-        const { error } = await supabase
-            .from('transactions')
-            .insert([payload]);
+        let savedOrder;
+        if (isUpdate) {
+            const { data, error } = await supabase
+                .from('orders')
+                .update(orderPayload)
+                .eq('id', order.id)
+                .select()
+                .single();
+            if (error) throw error;
+            savedOrder = data;
+        } else {
+            const { data, error } = await supabase
+                .from('orders')
+                .insert([orderPayload])
+                .select()
+                .single();
+            if (error) throw error;
+            savedOrder = data;
+        }
 
-        if (error) {
-            console.error('Error adding transaction:', error);
-            throw error;
+        // 2. Generate Ledger Entries (Only on new order for now, or full recalc)
+        if (!isUpdate) {
+            const ledgerEntries = [];
+
+            // Customer Ledger (Sale) - They owe you selling_price
+            ledgerEntries.push({
+                user_id: userId,
+                order_id: savedOrder.id,
+                person_id: order.customerId,
+                amount: order.sellingPrice || 0, // Positive = Receivable
+                transaction_type: 'Sale'
+            });
+
+            // Vendor Ledger (Purchase) - You owe them original_price
+            // If paidByDriver is true, you don't owe the vendor, you owe the driver.
+            if (order.paidByDriver && order.pickupPersonId) {
+                // To Driver (Reimbursement) - You owe driver original_price
+                ledgerEntries.push({
+                    user_id: userId,
+                    order_id: savedOrder.id,
+                    person_id: order.pickupPersonId,
+                    amount: -(order.originalPrice || 0), // Negative = Payable
+                    transaction_type: 'Reimbursement'
+                });
+            } else {
+                // To Vendor - You owe vendor original_price
+                ledgerEntries.push({
+                    user_id: userId,
+                    order_id: savedOrder.id,
+                    person_id: order.vendorId,
+                    amount: -(order.originalPrice || 0), // Negative = Payable
+                    transaction_type: 'Purchase'
+                });
+            }
+
+            const { error: ledgerError } = await supabase
+                .from('ledger')
+                .insert(ledgerEntries);
+
+            if (ledgerError) throw ledgerError;
         }
     },
 
-    async updateTransaction(id: string, target: 'vendor' | 'customer', status: 'Paid' | 'Udhar'): Promise<void> {
-        const column = target === 'vendor' ? 'vendor_payment_status' : 'customer_payment_status';
-        const { error } = await supabase
-            .from('transactions')
-            .update({ [column]: status })
-            .eq('id', id);
+    async getLedgerEntries(personId: string): Promise<LedgerEntry[]> {
+        const { data, error } = await supabase
+            .from('ledger')
+            .select('*')
+            .eq('person_id', personId)
+            .order('created_at', { ascending: false });
 
         if (error) {
-            console.error('Error updating transaction:', error);
-            throw error;
+            console.error('Error fetching ledger:', error);
+            return [];
         }
+
+        return (data || []).map(item => ({
+            id: item.id,
+            userId: item.user_id,
+            orderId: item.order_id,
+            personId: item.person_id,
+            amount: Number(item.amount),
+            transactionType: item.transaction_type as any,
+            notes: item.notes,
+            createdAt: new Date(item.created_at).getTime(),
+        })) as LedgerEntry[];
+    },
+
+    async addPayment(entry: Partial<LedgerEntry>, userId: string): Promise<void> {
+        const { error } = await supabase
+            .from('ledger')
+            .insert([{
+                user_id: userId,
+                person_id: entry.personId,
+                amount: entry.amount,
+                transaction_type: entry.transactionType,
+                notes: entry.notes
+            }]);
+
+        if (error) throw error;
+    },
+
+    async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
+        // Fetch directory and join with a sum of ledger amounts for each person
+        const { data: directoryData, error: directoryError } = await supabase
+            .from('directory')
+            .select(`
+                *,
+                ledger:ledger(amount)
+            `)
+            .eq('user_id', userId);
+
+        if (directoryError) {
+            console.error('Error fetching directory balances:', directoryError);
+            return [];
+        }
+
+        return (directoryData || []).map((item: any) => {
+            const balance = (item.ledger || []).reduce((acc: number, l: any) => acc + Number(l.amount), 0);
+            return {
+                ...item,
+                balance,
+                createdAt: new Date(item.created_at).getTime()
+            };
+        }) as DirectoryItem[];
+    },
+
+    // --- Legacy Support (to be removed after migration) ---
+    async getTransactions(userId: string): Promise<Transaction[]> {
+        // Redirecting legacy calls to the new Order model for stability
+        const orders = await this.getOrders(userId);
+        return orders.map(o => ({
+            ...o,
+            customerPaymentStatus: 'Udhar', // Defaulting for legacy UI
+            vendorPaymentStatus: 'Udhar',
+            marginPercentage: (o.margin / o.originalPrice) * 100
+        })) as any;
     },
 
     // --- Directory ---
@@ -177,20 +307,20 @@ export const supabaseService = {
         }
     },
 
-    // --- Master Shops ---
-    async getShops(userId: string): Promise<string[]> {
+    // --- Master Lists (for Autocomplete) ---
+    async getContactsByType(userId: string, type: 'Vendor' | 'Customer' | 'Product' | 'Pickup Person'): Promise<any[]> {
         const { data, error } = await supabase
             .from('directory')
-            .select('name')
+            .select('id, name')
             .eq('user_id', userId)
-            .eq('type', 'Vendor')
+            .eq('type', type)
             .order('name', { ascending: true });
 
         if (error) {
-            console.error('Error fetching shops:', error);
+            console.error(`Error fetching ${type}s:`, error);
             return [];
         }
 
-        return Array.from(new Set((data || []).map(item => item.name)));
+        return data || [];
     },
 };
