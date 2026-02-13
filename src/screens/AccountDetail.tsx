@@ -26,6 +26,11 @@ export default function AccountDetail() {
         notes: ''
     });
 
+    const [selectedEntry, setSelectedEntry] = useState<LedgerEntry | null>(null);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+    const [orderModalVisible, setOrderModalVisible] = useState(false);
+    const [editNotes, setEditNotes] = useState('');
+
     useEffect(() => {
         loadLedger();
     }, []);
@@ -60,6 +65,23 @@ export default function AccountDetail() {
         setModalVisible(false);
         setPaymentForm({ amount: '', type: 'PaymentOut', notes: '' });
         loadLedger();
+    };
+
+    const handleUpdateNotes = async () => {
+        if (!selectedEntry) return;
+        await supabaseService.updateLedgerEntry(selectedEntry.id, editNotes);
+        setEditModalVisible(false);
+        loadLedger();
+    };
+
+    const handleEntryPress = (item: LedgerEntry) => {
+        setSelectedEntry(item);
+        if (item.orderId) {
+            setOrderModalVisible(true);
+        } else {
+            setEditNotes(item.notes || '');
+            setEditModalVisible(true);
+        }
     };
 
     const currentBalance = ledger.reduce((acc, curr) => acc + curr.amount, 0);
@@ -149,30 +171,45 @@ export default function AccountDetail() {
                                     </View>
                                 </View>
 
-                                {/* Card Column */}
-                                <GlassCard className="flex-1 py-3 px-4 bg-white/5 border-white/5">
-                                    <View className="flex-row justify-between items-center">
-                                        <View className="flex-1 mr-2">
-                                            <Text className="text-white font-sans-bold text-sm">{item.transactionType}</Text>
-                                            <Text className="text-gray-500 font-sans text-[10px] mt-0.5">
-                                                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                            </Text>
-                                        </View>
-                                        <View className="items-end">
-                                            <Text className={cn(
-                                                "font-sans-bold text-base",
-                                                item.amount > 0 ? "text-emerald-400" : "text-rose-400"
-                                            )}>
-                                                {item.amount > 0 ? '+' : ''}{item.amount.toLocaleString()}
-                                            </Text>
-                                            {item.notes ? (
-                                                <Text className="text-gray-500 font-sans text-[10px] mt-0.5 italic max-w-[100px]" numberOfLines={1}>
-                                                    {item.notes}
+                                <TouchableOpacity
+                                    className="flex-1"
+                                    onPress={() => handleEntryPress(item)}
+                                >
+                                    <GlassCard className="flex-1 py-3 px-4 bg-white/5 border-white/5">
+                                        <View className="flex-row justify-between items-center">
+                                            <View className="flex-1 mr-2">
+                                                <Text className="text-white font-sans-bold text-sm" numberOfLines={1}>
+                                                    {item.orderProductName || item.transactionType}
                                                 </Text>
-                                            ) : null}
+                                                <View className="flex-row items-center mt-0.5">
+                                                    <Text className="text-gray-500 font-sans text-[10px]">
+                                                        {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                    </Text>
+                                                    {item.orderStatus && (
+                                                        <View className="ml-2 px-1.5 py-0.5 bg-indigo-500/20 rounded-md">
+                                                            <Text className="text-indigo-300 font-sans-bold text-[8px] uppercase">{item.orderStatus}</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            </View>
+                                            <View className="items-end">
+                                                <Text className={cn(
+                                                    "font-sans-bold text-base",
+                                                    item.amount > 0 ? "text-emerald-400" : "text-rose-400"
+                                                )}>
+                                                    {item.amount > 0 ? '+' : ''}{item.amount.toLocaleString()}
+                                                </Text>
+                                                {item.notes ? (
+                                                    <Text className="text-gray-500 font-sans text-[10px] mt-0.5 italic max-w-[100px]" numberOfLines={1}>
+                                                        {item.notes}
+                                                    </Text>
+                                                ) : item.orderId ? (
+                                                    <Text className="text-gray-600 font-sans text-[8px] mt-0.5 uppercase tracking-tighter">View Order</Text>
+                                                ) : null}
+                                            </View>
                                         </View>
-                                    </View>
-                                </GlassCard>
+                                    </GlassCard>
+                                </TouchableOpacity>
                             </View>
                         )}
                         ListEmptyComponent={
@@ -249,6 +286,85 @@ export default function AccountDetail() {
                                 </TouchableOpacity>
                             </View>
                         </KeyboardAvoidingView>
+                    </View>
+                </Modal>
+
+                {/* Edit Note Modal */}
+                <Modal visible={editModalVisible} transparent animationType="fade">
+                    <View className="flex-1 justify-center bg-black/60 px-6">
+                        <GlassCard className="bg-slate-900 border-white/10 p-6">
+                            <Text className="text-white font-sans-bold text-lg mb-4">Edit Note</Text>
+                            <Input
+                                placeholder="Add notes here..."
+                                value={editNotes}
+                                onChangeText={setEditNotes}
+                                multiline
+                                containerClassName="mb-6"
+                            />
+                            <View className="flex-row gap-3">
+                                <Button
+                                    variant="secondary"
+                                    onPress={() => setEditModalVisible(false)}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onPress={handleUpdateNotes}
+                                    className="flex-1"
+                                >
+                                    Save Changes
+                                </Button>
+                            </View>
+                        </GlassCard>
+                    </View>
+                </Modal>
+
+                {/* Order Preview Modal */}
+                <Modal visible={orderModalVisible} transparent animationType="fade">
+                    <View className="flex-1 justify-center bg-black/60 px-6">
+                        <GlassCard className="bg-slate-900 border-white/10 p-6">
+                            <View className="flex-row justify-between items-start mb-6">
+                                <View>
+                                    <Text className="text-gray-400 font-sans text-xs uppercase mb-1">Order Transaction</Text>
+                                    <Text className="text-white font-sans-bold text-xl">{selectedEntry?.orderProductName}</Text>
+                                </View>
+                                <TouchableOpacity onPress={() => setOrderModalVisible(false)} className="p-2 bg-white/5 rounded-full">
+                                    <X size={20} color="white" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <View className="space-y-4 mb-6">
+                                <View className="flex-row justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                    <Text className="text-gray-400 font-sans text-sm">Type</Text>
+                                    <Text className="text-indigo-300 font-sans-bold text-sm tracking-wide uppercase">{selectedEntry?.transactionType}</Text>
+                                </View>
+                                <View className="flex-row justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                    <Text className="text-gray-400 font-sans text-sm">Date</Text>
+                                    <Text className="text-white font-sans-bold text-sm">
+                                        {selectedEntry && new Date(selectedEntry.createdAt).toLocaleDateString()}
+                                    </Text>
+                                </View>
+                                <View className="flex-row justify-between p-3 bg-white/5 rounded-xl border border-white/5">
+                                    <Text className="text-gray-400 font-sans text-sm">Status</Text>
+                                    <Text className="text-emerald-400 font-sans-bold text-sm uppercase">{selectedEntry?.orderStatus}</Text>
+                                </View>
+                                <View className="flex-row justify-between p-4 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                                    <Text className="text-white font-sans-bold">Amount</Text>
+                                    <Text className={cn("text-lg font-sans-bold", (selectedEntry?.amount || 0) > 0 ? "text-emerald-400" : "text-rose-400")}>
+                                        ₹{Math.abs(selectedEntry?.amount || 0).toLocaleString()}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <Button
+                                variant="secondary"
+                                onPress={() => setOrderModalVisible(false)}
+                                className="w-full"
+                            >
+                                Close
+                            </Button>
+                        </GlassCard>
                     </View>
                 </Modal>
             </SafeAreaView>

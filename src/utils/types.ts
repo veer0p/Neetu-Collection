@@ -11,11 +11,12 @@ export interface Transaction {
     vendorPaymentStatus: 'Paid' | 'Udhar'; // Your payment to vendor
     customerPaymentStatus: 'Paid' | 'Udhar'; // Customer's payment to you
     pickupPaymentStatus?: 'Paid' | 'Udhar'; // Your payment to pickup person
-    paidByDriver?: boolean;
-    pickupPersonId?: string;
     pickupPersonName?: string;
     trackingId?: string;
     courierName?: string;
+    pickupCharges?: number;
+    shippingCharges?: number;
+    status: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
     notes?: string;
     createdAt: number;
 }
@@ -38,10 +39,13 @@ export interface Order {
     pickupPersonName?: string;
     trackingId?: string;
     courierName?: string;
-    notes?: string;
+    pickupCharges?: number;
+    shippingCharges?: number;
+    status: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
     vendorPaymentStatus?: 'Paid' | 'Udhar';
     customerPaymentStatus?: 'Paid' | 'Udhar';
     pickupPaymentStatus?: 'Paid' | 'Udhar';
+    notes?: string;
     createdAt: number;
 }
 
@@ -51,8 +55,10 @@ export interface LedgerEntry {
     orderId?: string;
     personId: string;
     amount: number; // Positive = Credit (owing/received), Negative = Debit (owed/paid)
-    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Reimbursement';
+    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Reimbursement' | 'ServiceFee';
     notes?: string;
+    orderProductName?: string; // Joined from orders
+    orderStatus?: string;      // Joined from orders
     createdAt: number;
 }
 
@@ -71,8 +77,9 @@ export interface DirectoryItem {
 
 export type Period = 'This Week' | 'This Month' | 'Last 3 Months' | 'Custom';
 
-export const calculateMargin = (original: number, selling: number) => {
-    const margin = selling - original;
+export const calculateMargin = (original: number, selling: number, pickup: number = 0, shipping: number = 0) => {
+    const totalCost = original + pickup + shipping;
+    const margin = selling - totalCost;
     const percentage = original > 0 ? (margin / original) * 100 : 0;
     return {
         margin,

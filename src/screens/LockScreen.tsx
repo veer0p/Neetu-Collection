@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Background } from '../components/Background';
 import { Fingerprint, Lock, ShieldCheck } from 'lucide-react-native';
 import { useBiometrics } from '../hooks/useBiometrics';
@@ -14,7 +14,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        handleAuthentication();
+        const timer = setTimeout(() => {
+            handleAuthentication();
+        }, 500);
+        return () => clearTimeout(timer);
     }, []);
 
     const handleAuthentication = async () => {

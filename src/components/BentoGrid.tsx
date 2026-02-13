@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, ViewProps } from 'react-native';
+import { View, Text, ViewProps } from 'react-native';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { GlassCard } from './GlassCard';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -16,7 +17,7 @@ export const BentoGrid = ({ children, className, ...props }: BentoGridProps) => 
     return (
         <View
             className={cn(
-                "flex flex-row flex-wrap gap-4 px-4",
+                "flex-row flex-wrap gap-4",
                 className
             )}
             {...props}
@@ -28,11 +29,26 @@ export const BentoGrid = ({ children, className, ...props }: BentoGridProps) => 
 
 interface BentoItemProps extends ViewProps {
     className?: string;
-    children: React.ReactNode;
+    title?: string;
+    value?: string;
+    icon?: React.ReactNode;
+    description?: string;
+    trend?: string;
     size?: 'sm' | 'md' | 'lg' | 'full';
+    children?: React.ReactNode;
 }
 
-export const BentoItem = ({ children, className, size = 'md', ...props }: BentoItemProps) => {
+export const BentoItem = ({
+    children,
+    className,
+    title,
+    value,
+    icon,
+    description,
+    trend,
+    size = 'md',
+    ...props
+}: BentoItemProps) => {
     const sizeClasses = {
         sm: "flex-[1_0_40%]",
         md: "flex-[1_0_45%]",
@@ -48,7 +64,18 @@ export const BentoItem = ({ children, className, size = 'md', ...props }: BentoI
             )}
             {...props}
         >
-            {children}
+            <GlassCard className="bg-white/5 border-white/5 p-4 h-full">
+                {icon && <View className="mb-3">{icon}</View>}
+                {title && <Text className="text-gray-500 font-sans-bold text-[10px] uppercase tracking-wider mb-1">{title}</Text>}
+                {value && (
+                    <View className="flex-row items-baseline">
+                        <Text className="text-white font-sans-bold text-xl">{value}</Text>
+                        {trend && <Text className="text-emerald-400 font-sans-bold text-[10px] ml-2">{trend}</Text>}
+                    </View>
+                )}
+                {description && <Text className="text-gray-500 font-sans text-[10px] mt-1">{description}</Text>}
+                {children}
+            </GlassCard>
         </View>
     );
 };

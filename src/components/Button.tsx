@@ -22,22 +22,62 @@ export const Button = ({
     textClassName,
     ...props
 }: ButtonProps) => {
+
+    const renderChildren = (childContent: React.ReactNode, defaultClassName: string) => {
+        if (typeof childContent === 'string') {
+            return (
+                <Text className={cn(defaultClassName, textClassName)}>
+                    {childContent}
+                </Text>
+            );
+        }
+
+        if (Array.isArray(childContent)) {
+            return childContent.map((child, index) => {
+                if (typeof child === 'string') {
+                    return (
+                        <Text key={index} className={cn(defaultClassName, textClassName)}>
+                            {child}
+                        </Text>
+                    );
+                }
+                return child;
+            });
+        }
+
+        if (React.isValidElement(childContent)) {
+            return childContent;
+        }
+
+        return (
+            <Text className={cn(defaultClassName, textClassName)}>
+                {childContent}
+            </Text>
+        );
+    };
+
+    // Primary with Gradient
     if (variant === 'primary') {
         return (
             <TouchableOpacity
                 activeOpacity={0.8}
-                className={cn("active:scale-95 transition-transform", className)}
+                className={cn("h-14 active:scale-95 transition-transform overflow-hidden", className)}
                 {...props}
             >
                 <LinearGradient
-                    colors={['#6366f1', '#a855f7']}
+                    colors={['#6366f1', '#4f46e5']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    className={cn("rounded-2xl px-6 py-4 items-center justify-center shadow-lg shadow-indigo-500/20", className)}
+                    style={{
+                        borderRadius: 16,
+                        width: '100%',
+                        height: '100%',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}
                 >
-                    <Text className={cn("text-white font-sans-bold text-lg", textClassName)}>
-                        {children}
-                    </Text>
+                    {renderChildren(children, "text-white font-sans-bold text-lg")}
                 </LinearGradient>
             </TouchableOpacity>
         );
@@ -52,15 +92,13 @@ export const Button = ({
         <TouchableOpacity
             activeOpacity={0.7}
             className={cn(
-                "rounded-2xl px-6 py-4 items-center justify-center border active:scale-95 transition-transform",
+                "rounded-2xl h-14 px-6 flex-row items-center justify-center border active:scale-95 transition-transform",
                 variantClasses[variant as 'secondary' | 'glass'],
                 className
             )}
             {...props}
         >
-            <Text className={cn("text-white font-sans-medium text-lg", textClassName)}>
-                {children}
-            </Text>
+            {renderChildren(children, "text-white font-sans-medium text-lg")}
         </TouchableOpacity>
     );
 };

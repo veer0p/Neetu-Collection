@@ -17,9 +17,12 @@ CREATE TABLE IF NOT EXISTS public.orders (
   pickup_person_id UUID REFERENCES public.directory(id),
   tracking_id TEXT,
   courier_name TEXT,
+  pickup_charges DECIMAL(12, 2) DEFAULT 0,
+  customer_payment_status TEXT DEFAULT 'Udhar',
+  pickup_payment_status TEXT DEFAULT 'Paid',
+  margin DECIMAL(12, 2) DEFAULT 0,
   notes TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  margin DECIMAL(12, 2) GENERATED ALWAYS AS (selling_price - original_price) STORED
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 2. Create Ledger Table (Financial History & Balances)
@@ -34,12 +37,7 @@ CREATE TABLE IF NOT EXISTS public.ledger (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Data Migration (Optional/Manual Step)
--- This logic assumes we manually link names to directory IDs during migration if possible, 
--- or we rely on the application to re-sync.
--- For a safe migration, we'll need to create temporary mapping functions.
-
--- 4. Security & Permissions
+-- 3. Security & Permissions
 ALTER TABLE IF EXISTS public.orders DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS public.ledger DISABLE ROW LEVEL SECURITY;
 
