@@ -1,264 +1,160 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, Switch, ActivityIndicator, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
+import { Card } from '../components/Card';
 import { Input } from '../components/Input';
 import { Button } from '../components/Button';
-import { GlassCard } from '../components/GlassCard';
 import { useTransactions } from '../hooks/useTransactions';
 import { supabaseService } from '../store/supabaseService';
-import { supabase } from '../utils/supabase';
-import { calculateMargin, Order } from '../utils/types';
 import {
-    ShoppingBag, IndianRupee, FileText, TrendingUp, User,
-    ShoppingCart, Truck, PlusCircle, LayoutGrid,
-    ArrowRight, ChevronDown, ChevronRight, Package,
-    BadgeCheck, Clock, UserCheck
+    ChevronLeft, Package, User, ShoppingBag, Truck, IndianRupee,
+    FileText, Check, MapPin
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ConfirmDialog } from '../components/ConfirmDialog';
 import { cn } from '../utils/cn';
+import { OrderStatus, Order } from '../utils/types';
 
-type OrderStatus = 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
+const STATUS_OPTIONS: OrderStatus[] = ['Booked', 'Shipped', 'Delivered', 'Canceled'];
 
-export default function AddEntry() {
+export default function AddEntry({ route }: any) {
     const navigation = useNavigation();
-    const { userId } = useTransactions();
-    const [successDialogVisible, setSuccessDialogVisible] = useState(false);
-    const [validationError, setValidationError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-
-    // Input Refs for Focus Management
-    const vendorRef = useRef<TextInput>(null);
-    const customerRef = useRef<TextInput>(null);
-    const productRef = useRef<TextInput>(null);
-    const purchaseRef = useRef<TextInput>(null);
-    const sellingRef = useRef<TextInput>(null);
-    const pickupChargeRef = useRef<TextInput>(null);
-    const shippingChargeRef = useRef<TextInput>(null);
-    const trackingRef = useRef<TextInput>(null);
-    const notesRef = useRef<TextInput>(null);
-    const driverRef = useRef<TextInput>(null);
+    const editingOrder = route.params?.orderData as Order | undefined;
+    const { userId, refresh } = useTransactions();
 
     const [form, setForm] = useState({
-        customerName: '',
-        customerId: '',
-        vendorName: '',
-        vendorId: '',
-        productName: '',
-        productId: '',
-        originalPrice: '',
-        sellingPrice: '',
-        pickupCharges: '',
-        shippingCharges: '',
-        status: 'Pending' as OrderStatus,
-        vendorPaymentStatus: 'Paid' as 'Paid' | 'Udhar',
-        customerPaymentStatus: 'Paid' as 'Paid' | 'Udhar',
-        pickupPersonId: '',
-        pickupPersonName: '',
-        paidByDriver: false,
-        pickupPaymentStatus: 'Paid' as 'Paid' | 'Udhar',
-        trackingId: '',
-        courierName: '',
-        notes: '',
+        productName: editingOrder?.productName || '',
+        vendorName: editingOrder?.vendorName || '',
+        customerName: editingOrder?.customerName || '',
+        pickupPersonName: editingOrder?.pickupPersonName || '',
+        productId: editingOrder?.productId || '',
+        customerId: editingOrder?.customerId || '',
+        vendorId: editingOrder?.vendorId || '',
+        pickupPersonId: editingOrder?.pickupPersonId || '',
+        originalPrice: editingOrder?.originalPrice?.toString() || '',
+        sellingPrice: editingOrder?.sellingPrice?.toString() || '',
+        shippingCharges: editingOrder?.shippingCharges?.toString() || '',
+        pickupCharges: editingOrder?.pickupCharges?.toString() || '',
+        status: (editingOrder?.status as OrderStatus) || 'Booked',
+        trackingId: editingOrder?.trackingId || '',
+        courierName: editingOrder?.courierName || '',
+        notes: editingOrder?.notes || '',
+        customerPaymentStatus: (editingOrder?.customerPaymentStatus as 'Paid' | 'Udhar') || 'Udhar',
+        vendorPaymentStatus: (editingOrder?.vendorPaymentStatus as 'Paid' | 'Udhar') || 'Udhar',
+        pickupPaymentStatus: (editingOrder?.pickupPaymentStatus as 'Paid' | 'Udhar') || 'Udhar',
+        paidByDriver: editingOrder?.paidByDriver || false,
+        date: editingOrder?.date || new Date().toISOString().split('T')[0],
     });
 
-    const [showPickupPerson, setShowPickupPerson] = useState(false);
-    const [masterVendors, setMasterVendors] = useState<{ id: string, name: string }[]>([]);
-    const [masterCustomers, setMasterCustomers] = useState<{ id: string, name: string }[]>([]);
-    const [masterProducts, setMasterProducts] = useState<{ id: string, name: string }[]>([]);
-    const [masterPickupPersons, setMasterPickupPersons] = useState<{ id: string, name: string }[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [suggestions, setSuggestions] = useState<{ type: string, data: any[] }>({ type: '', data: [] });
 
-    const [filteredVendors, setFilteredVendors] = useState<{ id: string, name: string }[]>([]);
-    const [filteredCustomers, setFilteredCustomers] = useState<{ id: string, name: string }[]>([]);
-    const [filteredProducts, setFilteredProducts] = useState<{ id: string, name: string }[]>([]);
-    const [filteredPickupPersons, setFilteredPickupPersons] = useState<{ id: string, name: string }[]>([]);
+    // Master Data for Suggestions
+    const [masterData, setMasterData] = useState({
+        products: [] as any[],
+        vendors: [] as any[],
+        customers: [] as any[],
+        pickups: [] as any[]
+    });
 
-    const [showVendorSuggestions, setShowVendorSuggestions] = useState(false);
-    const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
-    const [showProductSuggestions, setShowProductSuggestions] = useState(false);
-    const [showPickupPersonSuggestions, setShowPickupPersonSuggestions] = useState(false);
+    useEffect(() => {
+        loadDirectory();
+    }, [userId]); // Added userId to dependency array to re-run when userId is available
 
-    const [marginInfo, setMarginInfo] = useState({ margin: 0, percentage: 0 });
-
-    const loadMasterData = async () => {
+    const loadDirectory = async () => {
         if (!userId) return;
-        const [vendors, customers, products, pickups] = await Promise.all([
-            supabaseService.getContactsByType(userId, 'Vendor'),
-            supabaseService.getContactsByType(userId, 'Customer'),
-            supabaseService.getContactsByType(userId, 'Product'),
-            supabaseService.getContactsByType(userId, 'Pickup Person')
+        const [p, d] = await Promise.all([
+            supabaseService.getProducts(),
+            supabaseService.getDirectory(userId)
         ]);
-        setMasterVendors(vendors);
-        setMasterCustomers(customers);
-        setMasterProducts(products);
-        setMasterPickupPersons(pickups);
+        setMasterData({
+            products: p,
+            vendors: d.filter(item => item.type === 'Vendor'),
+            customers: d.filter(item => item.type === 'Customer'),
+            pickups: d.filter(item => item.type === 'Pickup Person')
+        });
     };
 
-    useEffect(() => {
-        if (userId) loadMasterData();
-    }, [userId]);
+    const handleSuggest = (text: string, type: 'product' | 'vendor' | 'customer' | 'pickup') => {
+        let fieldName = '';
+        let list: any[] = [];
 
-    useEffect(() => {
-        const original = parseFloat(form.originalPrice) || 0;
-        const selling = parseFloat(form.sellingPrice) || 0;
-        const pickup = parseFloat(form.pickupCharges) || 0;
-        const shipping = parseFloat(form.shippingCharges) || 0;
+        switch (type) {
+            case 'product': fieldName = 'productName'; list = masterData.products; break;
+            case 'vendor': fieldName = 'vendorName'; list = masterData.vendors; break;
+            case 'customer': fieldName = 'customerName'; list = masterData.customers; break;
+            case 'pickup': fieldName = 'pickupPersonName'; list = masterData.pickups; break;
+        }
 
-        setMarginInfo(calculateMargin(original, selling, pickup, shipping));
-    }, [form.originalPrice, form.sellingPrice, form.pickupCharges, form.shippingCharges]);
+        setForm(prev => ({ ...prev, [fieldName]: text }));
 
-    const handleVendorNameChange = (text: string) => {
-        setForm({ ...form, vendorName: text, vendorId: '' });
-        if (text.length > 0) {
-            const filtered = masterVendors.filter(v => v.name.toLowerCase().includes(text.toLowerCase()));
-            setFilteredVendors(filtered);
-            setShowVendorSuggestions(filtered.length > 0);
-        } else setShowVendorSuggestions(false);
+        if (text.length > 1) {
+            const filtered = list.filter(item => item.name.toLowerCase().includes(text.toLowerCase()));
+            setSuggestions({ type, data: filtered.slice(0, 5) });
+        } else {
+            setSuggestions({ type: '', data: [] });
+        }
     };
 
-    const handleCustomerNameChange = (text: string) => {
-        setForm({ ...form, customerName: text, customerId: '' });
-        if (text.length > 0) {
-            const filtered = masterCustomers.filter(c => c.name.toLowerCase().includes(text.toLowerCase()));
-            setFilteredCustomers(filtered);
-            setShowCustomerSuggestions(filtered.length > 0);
-        } else setShowCustomerSuggestions(false);
-    };
-
-    const handleProductNameChange = (text: string) => {
-        setForm({ ...form, productName: text, productId: '' });
-        if (text.length > 0) {
-            const filtered = masterProducts.filter(p => p.name.toLowerCase().includes(text.toLowerCase()));
-            setFilteredProducts(filtered);
-            setShowProductSuggestions(filtered.length > 0);
-        } else setShowProductSuggestions(false);
-    };
-
-    const handlePickupPersonNameChange = (text: string) => {
-        setForm({ ...form, pickupPersonName: text, pickupPersonId: '' });
-        if (text.length > 0) {
-            const filtered = masterPickupPersons.filter(p => p.name.toLowerCase().includes(text.toLowerCase()));
-            setFilteredPickupPersons(filtered);
-            setShowPickupPersonSuggestions(filtered.length > 0);
-        } else setShowPickupPersonSuggestions(false);
+    const selectSuggestion = (item: any) => {
+        switch (suggestions.type) {
+            case 'product': setForm(prev => ({ ...prev, productName: item.name, productId: item.id })); break;
+            case 'vendor': setForm(prev => ({ ...prev, vendorName: item.name, vendorId: item.id })); break;
+            case 'customer': setForm(prev => ({ ...prev, customerName: item.name, customerId: item.id })); break;
+            case 'pickup': setForm(prev => ({ ...prev, pickupPersonName: item.name, pickupPersonId: item.id })); break;
+        }
+        setSuggestions({ type: '', data: [] });
     };
 
     const handleSave = async () => {
-        if (!userId) return;
-        const requiredFields = ['customerName', 'vendorName', 'productName', 'originalPrice', 'sellingPrice'];
-
-        for (const field of requiredFields) {
-            if (!(form as any)[field]) {
-                setValidationError('Please complete all required fields.');
-                return;
-            }
-        }
-
+        if (!userId || !form.productName || !form.customerName || !form.vendorName) return;
         setLoading(true);
+
         try {
-            const resolveId = async (name: string, type: 'Vendor' | 'Customer' | 'Product' | 'Pickup Person', currentId: string | undefined) => {
-                if (!name) return undefined;
-                if (currentId) return currentId;
-
-                const masters: Record<string, any[]> = {
-                    'Vendor': masterVendors, 'Customer': masterCustomers,
-                    'Product': masterProducts, 'Pickup Person': masterPickupPersons
-                };
-                const match = masters[type].find(m => m.name.toLowerCase() === name.toLowerCase());
-                if (match) return match.id;
-
-                const { data, error } = await supabase
-                    .from('directory')
-                    .insert([{ user_id: userId, name: name, type: type }])
-                    .select().single();
-
-                if (error) throw error;
-                return data.id;
-            };
-
-            const [vId, cId, pId, pickupId] = await Promise.all([
-                resolveId(form.vendorName, 'Vendor', form.vendorId),
-                resolveId(form.customerName, 'Customer', form.customerId),
-                resolveId(form.productName, 'Product', form.productId),
-                form.pickupPersonName ? resolveId(form.pickupPersonName, 'Pickup Person', form.pickupPersonId) : Promise.resolve(undefined)
-            ]);
-
-            const orderPayload: Partial<Order> = {
-                date: new Date().toLocaleDateString('en-IN'),
-                productId: pId,
-                customerId: cId,
-                vendorId: vId,
-                originalPrice: parseFloat(form.originalPrice),
-                sellingPrice: parseFloat(form.sellingPrice),
-                pickupCharges: parseFloat(form.pickupCharges) || 0,
+            const orderData: Partial<Order> = {
+                ...form,
+                originalPrice: parseFloat(form.originalPrice) || 0,
+                sellingPrice: parseFloat(form.sellingPrice) || 0,
                 shippingCharges: parseFloat(form.shippingCharges) || 0,
-                status: form.status,
-                paidByDriver: form.paidByDriver,
-                pickupPersonId: pickupId,
-                trackingId: form.trackingId,
-                courierName: form.courierName,
-                notes: form.notes,
-                vendorPaymentStatus: form.vendorPaymentStatus,
-                customerPaymentStatus: form.customerPaymentStatus,
-                pickupPaymentStatus: form.pickupPaymentStatus,
+                pickupCharges: parseFloat(form.pickupCharges) || 0,
+                id: editingOrder?.id
             };
 
-            await supabaseService.saveOrder(orderPayload, userId);
-            setSuccessDialogVisible(true);
-
-            // Reset state
-            setForm({
-                customerName: '', customerId: '', vendorName: '', vendorId: '',
-                productName: '', productId: '', originalPrice: '', sellingPrice: '',
-                pickupCharges: '', shippingCharges: '', status: 'Pending',
-                vendorPaymentStatus: 'Paid', customerPaymentStatus: 'Paid',
-                pickupPersonId: '', pickupPersonName: '', paidByDriver: false,
-                pickupPaymentStatus: 'Paid', trackingId: '', courierName: '', notes: '',
-            });
-            setShowPickupPerson(false);
-            loadMasterData();
+            await supabaseService.saveOrder(orderData, userId);
+            await refresh();
+            navigation.goBack();
         } catch (error) {
-            console.error('Error saving order:', error);
-            setValidationError('Failed to save order. Check your connection.');
+            console.error('Save error:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const SectionHeader = ({ icon: Icon, title, isOptional }: { icon: any, title: string, isOptional?: boolean }) => (
-        <View className="flex-row items-center mb-3 mt-2 px-1">
-            <View className="w-6 h-6 rounded-full bg-indigo-500/20 items-center justify-center mr-2">
-                <Icon size={12} color="#818cf8" />
+    const Section = ({ title, icon: Icon, children }: any) => (
+        <View className="mb-6">
+            <View className="flex-row items-center mb-3 px-1">
+                <Icon size={16} color="#4F46E5" />
+                <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm ml-2 uppercase tracking-wider">{title}</Text>
             </View>
-            <Text className="text-gray-400 font-sans-bold text-[10px] uppercase tracking-[2px] flex-1">{title}</Text>
-            {isOptional && <Text className="text-gray-600 font-sans text-[10px] uppercase">Optional</Text>}
+            <Card className="p-4">{children}</Card>
         </View>
     );
 
-    const StatusTab = ({ label, active, onSelect }: { label: OrderStatus, active: boolean, onSelect: () => void }) => (
-        <TouchableOpacity
-            onPress={onSelect}
-            className={cn(
-                "px-3 py-2 rounded-xl mr-2 mb-2 border",
-                active ? "bg-indigo-600 border-indigo-400" : "bg-white/5 border-white/10"
-            )}
-        >
-            <Text className={cn("font-sans-bold text-[10px]", active ? "text-white" : "text-gray-500")}>
-                {label.toUpperCase()}
-            </Text>
-        </TouchableOpacity>
-    );
-
-    const PaymentToggle = ({ label, value, onSelect }: { label: string, value: 'Paid' | 'Udhar', onSelect: (v: 'Paid' | 'Udhar') => void }) => (
-        <View className="flex-row items-center justify-between mb-2 px-1">
-            <Text className="text-gray-500 font-sans-medium text-[11px]">{label}</Text>
-            <View className="flex-row bg-white/5 rounded-lg p-0.5 border border-white/10">
-                <TouchableOpacity onPress={() => onSelect('Paid')} className={cn("px-3 py-1 rounded-md", value === 'Paid' ? "bg-emerald-500/20" : "")}>
-                    <Text className={cn("text-[10px] font-sans-bold", value === 'Paid' ? "text-emerald-400" : "text-gray-600")}>PAID</Text>
+    const ToggleRow = ({ label, value, onToggle }: { label: string, value: 'Paid' | 'Udhar', onToggle: (v: 'Paid' | 'Udhar') => void }) => (
+        <View className="flex-row items-center justify-between py-2">
+            <Text className="text-primary dark:text-primary-dark font-sans-medium">{label}</Text>
+            <View className="flex-row bg-surface dark:bg-surface-dark rounded-xl p-1 border border-divider dark:border-divider-dark">
+                <TouchableOpacity
+                    onPress={() => onToggle('Paid')}
+                    className={cn("px-4 py-1.5 rounded-lg", value === 'Paid' ? "bg-success" : "bg-transparent")}
+                >
+                    <Text className={cn("text-xs font-sans-bold", value === 'Paid' ? "text-white" : "text-secondary dark:text-secondary-dark")}>PAID</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => onSelect('Udhar')} className={cn("px-3 py-1 rounded-md", value === 'Udhar' ? "bg-orange-500/20" : "")}>
-                    <Text className={cn("text-[10px] font-sans-bold", value === 'Udhar' ? "text-orange-400" : "text-gray-600")}>UDHAR</Text>
+                <TouchableOpacity
+                    onPress={() => onToggle('Udhar')}
+                    className={cn("px-4 py-1.5 rounded-lg", value === 'Udhar' ? "bg-danger" : "bg-transparent")}
+                >
+                    <Text className={cn("text-xs font-sans-bold", value === 'Udhar' ? "text-white" : "text-secondary dark:text-secondary-dark")}>UDHAR</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -266,348 +162,188 @@ export default function AddEntry() {
 
     return (
         <Background>
-            <SafeAreaView className="flex-1">
+            <SafeAreaView className="flex-1" edges={['top']}>
+                <View className="px-6 pt-4 pb-2 flex-row items-center justify-between">
+                    <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl">
+                        <ChevronLeft color="#4F46E5" size={20} />
+                    </TouchableOpacity>
+                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{editingOrder ? 'Edit Order' : 'New Order'}</Text>
+                    <View className="w-10" />
+                </View>
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-                    className="flex-1"
-                    keyboardVerticalOffset={Platform.OS === 'ios' ? 150 : 100}
-                >
-                    <ScrollView
-                        className="flex-1 px-4"
-                        contentContainerStyle={{ paddingBottom: 180 }}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                    >
-
-                        {/* 1. Contacts Section */}
-                        <GlassCard className="mb-4 bg-slate-900/40 p-4 border-white/5" style={{ zIndex: 1000 }}>
-                            <SectionHeader icon={User} title="Parties Involved" />
-                            <View className="mb-4" style={{ zIndex: 1000 }}>
-                                <View style={{ zIndex: 2000 }}>
-                                    <Input
-                                        ref={vendorRef}
-                                        placeholder="Vendor Name (Supplier) *"
-                                        value={form.vendorName}
-                                        onChangeText={handleVendorNameChange}
-                                        containerClassName="mb-3"
-                                        className="h-12 text-sm"
-                                        leftIcon={<ShoppingCart size={14} color="#6366f1" />}
-                                        onFocus={() => setShowVendorSuggestions(form.vendorName.length > 0 && filteredVendors.length > 0)}
-                                        onBlur={() => setTimeout(() => setShowVendorSuggestions(false), 200)}
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => customerRef.current?.focus()}
-                                    />
-                                    {showVendorSuggestions && (
-                                        <View className="absolute top-[55px] left-0 right-0 bg-slate-800 border border-white/10 rounded-xl overflow-hidden z-[5000] shadow-xl">
-                                            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="always">
-                                                {filteredVendors.map((v, i) => (
-                                                    <TouchableOpacity key={i} className="px-4 py-3 border-b border-white/5 active:bg-white/10" onPress={() => { setForm({ ...form, vendorName: v.name, vendorId: v.id }); setShowVendorSuggestions(false); }}>
-                                                        <Text className="text-white text-xs">{v.name}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
-                                        </View>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 24, paddingBottom: 60 }}>
+                        {/* Status */}
+                        <View className="flex-row gap-2 mb-8 bg-surface dark:bg-surface-dark p-1 rounded-2xl border border-divider dark:border-divider-dark">
+                            {STATUS_OPTIONS.map(s => (
+                                <TouchableOpacity
+                                    key={s}
+                                    onPress={() => setForm(prev => ({ ...prev, status: s }))}
+                                    className={cn(
+                                        "flex-1 py-3 rounded-xl items-center",
+                                        form.status === s ? "bg-accent shadow-sm" : "bg-transparent"
                                     )}
-                                </View>
+                                >
+                                    <Text className={cn("text-[10px] font-sans-bold uppercase", form.status === s ? "text-white" : "text-secondary dark:text-secondary-dark")}>{s}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
 
-                                <View style={{ zIndex: 1500 }}>
-                                    <Input
-                                        ref={customerRef}
-                                        placeholder="Customer Name (Buyer) *"
-                                        value={form.customerName}
-                                        onChangeText={handleCustomerNameChange}
-                                        containerClassName="mb-0"
-                                        className="h-12 text-sm"
-                                        leftIcon={<User size={14} color="#10b981" />}
-                                        onFocus={() => setShowCustomerSuggestions(form.customerName.length > 0 && filteredCustomers.length > 0)}
-                                        onBlur={() => setTimeout(() => setShowCustomerSuggestions(false), 200)}
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => productRef.current?.focus()}
-                                    />
-                                    {showCustomerSuggestions && (
-                                        <View className="absolute top-[55px] left-0 right-0 bg-slate-800 border border-white/10 rounded-xl overflow-hidden z-[5000] shadow-xl">
-                                            <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="always">
-                                                {filteredCustomers.map((c, i) => (
-                                                    <TouchableOpacity key={i} className="px-4 py-3 border-b border-white/5 active:bg-white/10" onPress={() => { setForm({ ...form, customerName: c.name, customerId: c.id }); setShowCustomerSuggestions(false); }}>
-                                                        <Text className="text-white text-xs">{c.name}</Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </ScrollView>
-                                        </View>
-                                    )}
-                                </View>
-                            </View>
-                            <View className="h-[1px] bg-white/5 my-3" />
-                            <PaymentToggle label="Vendor Payment" value={form.vendorPaymentStatus} onSelect={(v) => {
-                                if (form.paidByDriver && v === 'Udhar') return;
-                                setForm({ ...form, vendorPaymentStatus: v });
-                            }} />
-                            <PaymentToggle label="Customer Payment" value={form.customerPaymentStatus} onSelect={(v) => setForm({ ...form, customerPaymentStatus: v })} />
-                        </GlassCard>
+                        {/* Product & Parties */}
+                        <Section title="Item & Parties" icon={Package}>
+                            <Input
+                                label="Product Name"
+                                placeholder="Search or type product..."
+                                value={form.productName}
+                                onChangeText={text => handleSuggest(text, 'product')}
+                                leftIcon={<ShoppingBag size={18} color="#9CA3AF" />}
+                            />
+                            <Input
+                                label="Customer"
+                                placeholder="Search or type customer..."
+                                value={form.customerName}
+                                onChangeText={text => handleSuggest(text, 'customer')}
+                                leftIcon={<User size={18} color="#9CA3AF" />}
+                            />
+                            <Input
+                                label="Vendor"
+                                placeholder="Search or type vendor..."
+                                value={form.vendorName}
+                                onChangeText={text => handleSuggest(text, 'vendor')}
+                                leftIcon={<Truck size={18} color="#9CA3AF" />}
+                            />
+                            <Input
+                                label="Pickup (Optional)"
+                                placeholder="Search or type person..."
+                                value={form.pickupPersonName}
+                                onChangeText={text => handleSuggest(text, 'pickup')}
+                                leftIcon={<MapPin size={18} color="#9CA3AF" />}
+                            />
+                        </Section>
 
-                        {/* 2. Product & Pricing Section */}
-                        <GlassCard className="mb-4 bg-slate-900/40 p-4 border-white/5">
-                            <SectionHeader icon={Package} title="Product & Pricing" />
-                            <View className="mb-4" style={{ zIndex: 1000 }}>
-                                <Input
-                                    ref={productRef}
-                                    placeholder="Product Name *"
-                                    value={form.productName}
-                                    onChangeText={handleProductNameChange}
-                                    containerClassName="mb-0"
-                                    className="h-12 text-sm"
-                                    leftIcon={<ShoppingBag size={14} color="#f59e0b" />}
-                                    onFocus={() => setShowProductSuggestions(form.productName.length > 0 && filteredProducts.length > 0)}
-                                    onBlur={() => setTimeout(() => setShowProductSuggestions(false), 200)}
-                                    returnKeyType="next"
-                                    blurOnSubmit={false}
-                                    onSubmitEditing={() => purchaseRef.current?.focus()}
-                                />
-                                {showProductSuggestions && (
-                                    <View className="absolute top-[55px] left-0 right-0 bg-slate-800 border border-white/10 rounded-xl overflow-hidden z-[5000] shadow-xl">
-                                        <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="always">
-                                            {filteredProducts.map((p, i) => (
-                                                <TouchableOpacity key={i} className="px-4 py-3 border-b border-white/5 active:bg-white/10" onPress={() => { setForm({ ...form, productName: p.name, productId: p.id }); setShowProductSuggestions(false); }}>
-                                                    <Text className="text-white text-xs">{p.name}</Text>
-                                                </TouchableOpacity>
-                                            ))}
-                                        </ScrollView>
-                                    </View>
-                                )}
-                            </View>
-
-                            <View className="flex-row gap-3">
+                        {/* Financials */}
+                        <Section title="Financials" icon={IndianRupee}>
+                            <View className="flex-row gap-4">
                                 <View className="flex-1">
                                     <Input
-                                        ref={purchaseRef}
-                                        label="Purchase (₹) *"
+                                        label="Cost Price"
                                         placeholder="0"
                                         keyboardType="numeric"
                                         value={form.originalPrice}
-                                        onChangeText={t => setForm({ ...form, originalPrice: t })}
-                                        containerClassName="mb-0"
-                                        className="h-12 text-sm"
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => sellingRef.current?.focus()}
+                                        onChangeText={text => setForm(prev => ({ ...prev, originalPrice: text }))}
                                     />
                                 </View>
                                 <View className="flex-1">
                                     <Input
-                                        ref={sellingRef}
-                                        label="Selling (₹) *"
+                                        label="Sales Price"
                                         placeholder="0"
                                         keyboardType="numeric"
                                         value={form.sellingPrice}
-                                        onChangeText={t => setForm({ ...form, sellingPrice: t })}
-                                        containerClassName="mb-0"
-                                        className="h-12 text-sm"
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => {
-                                            if (showPickupPerson) {
-                                                driverRef.current?.focus();
-                                            } else {
-                                                pickupChargeRef.current?.focus();
-                                            }
-                                        }}
+                                        onChangeText={text => setForm(prev => ({ ...prev, sellingPrice: text }))}
                                     />
                                 </View>
                             </View>
-
-                            {/* Profit Badge */}
-                            {(parseFloat(form.sellingPrice) > 0) && (
-                                <View className="mt-4 flex-row items-center justify-between bg-indigo-500/10 p-3 rounded-2xl border border-indigo-500/20">
-                                    <View>
-                                        <Text className="text-gray-500 font-sans text-[10px] uppercase">Net Profit</Text>
-                                        <Text className={cn("text-lg font-sans-bold", marginInfo.margin >= 0 ? "text-emerald-400" : "text-rose-400")}>
-                                            ₹{marginInfo.margin.toLocaleString()}
-                                        </Text>
-                                    </View>
-                                    <View className="items-end">
-                                        <Text className="text-gray-500 font-sans text-[10px] uppercase">Margin</Text>
-                                        <Text className="text-indigo-300 font-sans-bold">{marginInfo.percentage}%</Text>
-                                    </View>
-                                </View>
-                            )}
-                        </GlassCard>
-
-                        {/* 3. Status & Fulfillment Section */}
-                        <GlassCard className="mb-4 bg-slate-900/40 p-4 border-white/5">
-                            <SectionHeader icon={Clock} title="Order Status" />
-                            <View className="flex-row flex-wrap mb-4">
-                                {(['Pending', 'Booked', 'Shipped', 'Delivered'] as OrderStatus[]).map(s => (
-                                    <StatusTab key={s} label={s} active={form.status === s} onSelect={() => setForm({ ...form, status: s })} />
-                                ))}
-                            </View>
-
-                            <View className="h-[1px] bg-white/5 my-2" />
-
-                            {!showPickupPerson ? (
-                                <TouchableOpacity onPress={() => setShowPickupPerson(true)} className="py-3 flex-row items-center">
-                                    <View className="w-8 h-8 rounded-full bg-white/5 items-center justify-center mr-3">
-                                        <Truck size={14} color="#94a3b8" />
-                                    </View>
-                                    <Text className="text-gray-400 font-sans-medium text-xs flex-1">Assign Pickup Driver?</Text>
-                                    <ChevronRight size={16} color="#475569" />
-                                </TouchableOpacity>
-                            ) : (
-                                <View className="mt-4">
-                                    <View className="flex-row justify-between items-center mb-3">
-                                        <Text className="text-indigo-400 font-sans-bold text-[10px] uppercase tracking-wider">Pickup Details</Text>
-                                        <TouchableOpacity onPress={() => { setShowPickupPerson(false); setForm(f => ({ ...f, pickupPersonName: '', pickupPersonId: '', paidByDriver: false })); }}>
-                                            <Text className="text-rose-400 font-sans-bold text-[10px]">REMOVE</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <View className="mb-4" style={{ zIndex: 1000 }}>
-                                        <Input
-                                            ref={driverRef}
-                                            placeholder="Driver Name *"
-                                            value={form.pickupPersonName}
-                                            onChangeText={handlePickupPersonNameChange}
-                                            containerClassName="mb-0"
-                                            className="h-12 text-sm"
-                                            leftIcon={<UserCheck size={14} color="#818cf8" />}
-                                            onFocus={() => setShowPickupPersonSuggestions(form.pickupPersonName.length > 0 && filteredPickupPersons.length > 0)}
-                                            onBlur={() => setTimeout(() => setShowPickupPersonSuggestions(false), 200)}
-                                            returnKeyType="next"
-                                            blurOnSubmit={false}
-                                            onSubmitEditing={() => pickupChargeRef.current?.focus()}
-                                        />
-                                        {showPickupPersonSuggestions && (
-                                            <View className="absolute top-[55px] left-0 right-0 bg-slate-800 border border-white/10 rounded-xl overflow-hidden z-[5000] shadow-xl">
-                                                <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled={true} keyboardShouldPersistTaps="always">
-                                                    {filteredPickupPersons.map((p, i) => (
-                                                        <TouchableOpacity key={i} className="px-4 py-3 border-b border-white/5 active:bg-white/10" onPress={() => { setForm({ ...form, pickupPersonName: p.name, pickupPersonId: p.id }); setShowPickupPersonSuggestions(false); }}>
-                                                            <Text className="text-white text-xs">{p.name}</Text>
-                                                        </TouchableOpacity>
-                                                    ))}
-                                                </ScrollView>
-                                            </View>
-                                        )}
-                                    </View>
-
-                                    <View className="flex-row items-center justify-between mb-4 bg-white/5 p-3 rounded-2xl border border-white/5">
-                                        <View className="flex-1 mr-4">
-                                            <Text className="text-gray-300 font-sans-bold text-[11px]">Paid by Driver?</Text>
-                                            <Text className="text-gray-500 font-sans text-[9px]">They paid the shop upfront</Text>
-                                        </View>
-                                        <Switch
-                                            value={form.paidByDriver}
-                                            onValueChange={v => setForm({ ...form, paidByDriver: v, vendorPaymentStatus: v ? 'Paid' : form.vendorPaymentStatus, pickupPaymentStatus: v ? 'Udhar' : 'Paid' })}
-                                            trackColor={{ false: '#334155', true: '#6366f1' }}
-                                        />
-                                    </View>
-
-                                    {form.paidByDriver && (
-                                        <PaymentToggle label="Driver Reimbursement" value={form.pickupPaymentStatus} onSelect={(v) => setForm({ ...form, pickupPaymentStatus: v })} />
-                                    )}
-                                </View>
-                            )}
-                        </GlassCard>
-
-                        {/* 4. Charges & Tracking Section */}
-                        <GlassCard className="mb-6 bg-slate-900/40 p-4 border-white/5">
-                            <SectionHeader icon={TrendingUp} title="Charges & Details" isOptional />
-                            <View className="flex-row gap-3 mb-4">
+                            <View className="flex-row gap-4">
                                 <View className="flex-1">
                                     <Input
-                                        ref={pickupChargeRef}
-                                        label="Pickup Cost"
+                                        label="Pickup Ch."
                                         placeholder="0"
                                         keyboardType="numeric"
                                         value={form.pickupCharges}
-                                        onChangeText={t => setForm({ ...form, pickupCharges: t })}
-                                        containerClassName="mb-0"
-                                        className="h-12 text-sm"
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => shippingChargeRef.current?.focus()}
+                                        onChangeText={text => setForm(prev => ({ ...prev, pickupCharges: text }))}
                                     />
                                 </View>
                                 <View className="flex-1">
                                     <Input
-                                        ref={shippingChargeRef}
-                                        label="Shipping Cost"
+                                        label="Ship Ch."
                                         placeholder="0"
                                         keyboardType="numeric"
                                         value={form.shippingCharges}
-                                        onChangeText={t => setForm({ ...form, shippingCharges: t })}
-                                        containerClassName="mb-0"
-                                        className="h-12 text-sm"
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => trackingRef.current?.focus()}
+                                        onChangeText={text => setForm(prev => ({ ...prev, shippingCharges: text }))}
                                     />
                                 </View>
                             </View>
+                        </Section>
 
+                        {/* Payment Settlement */}
+                        <Section title="Settlement" icon={Check}>
+                            <ToggleRow
+                                label="Customer Payment"
+                                value={form.customerPaymentStatus}
+                                onToggle={v => setForm(prev => ({ ...prev, customerPaymentStatus: v }))}
+                            />
+                            <ToggleRow
+                                label="Vendor Payment"
+                                value={form.vendorPaymentStatus}
+                                onToggle={v => setForm(prev => ({ ...prev, vendorPaymentStatus: v }))}
+                            />
+                            {form.pickupPersonName && (
+                                <View className="mt-2 pt-2 border-t border-divider">
+                                    <ToggleRow
+                                        label="Pickup Payment"
+                                        value={form.pickupPaymentStatus}
+                                        onToggle={v => setForm(prev => ({ ...prev, pickupPaymentStatus: v }))}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => setForm(p => ({ ...p, paidByDriver: !p.paidByDriver }))}
+                                        className="flex-row items-center py-2"
+                                    >
+                                        <View className={cn("w-5 h-5 rounded border items-center justify-center mr-3", form.paidByDriver ? "bg-accent border-accent" : "bg-transparent border-divider")}>
+                                            {form.paidByDriver && <Check size={14} color="white" />}
+                                        </View>
+                                        <Text className="text-secondary font-sans text-xs">Paid by Driver — vendor settled at pickup</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </Section>
+
+                        {/* Additional Info */}
+                        <Section title="Additional Info" icon={FileText}>
                             <Input
-                                ref={trackingRef}
                                 label="Tracking ID"
-                                placeholder="Order reference/tracking"
+                                placeholder="AWB xxxx"
                                 value={form.trackingId}
-                                onChangeText={t => setForm({ ...form, trackingId: t })}
-                                containerClassName="mb-4"
-                                className="h-12 text-sm"
-                                leftIcon={<BadgeCheck size={14} color="#94a3b8" />}
-                                returnKeyType="next"
-                                blurOnSubmit={false}
-                                onSubmitEditing={() => notesRef.current?.focus()}
+                                onChangeText={text => setForm(prev => ({ ...prev, trackingId: text }))}
                             />
-
                             <Input
-                                ref={notesRef}
                                 label="Notes"
-                                placeholder="..."
-                                value={form.notes}
-                                onChangeText={t => setForm({ ...form, notes: t })}
+                                placeholder="Any extra details..."
                                 multiline
-                                containerClassName="mb-0"
-                                className="h-20 py-2 text-sm"
-                                textAlignVertical="top"
+                                value={form.notes}
+                                onChangeText={text => setForm(prev => ({ ...prev, notes: text }))}
                             />
-                        </GlassCard>
-
-                        <View style={{ height: 60 }} />
+                        </Section>
 
                         <Button
                             onPress={handleSave}
-                            className="bg-indigo-600 h-14 rounded-2xl flex-row items-center justify-center shadow-xl shadow-indigo-500/20"
-                            disabled={loading}
+                            disabled={loading || !form.productName || !form.customerName}
+                            className="mt-4 mb-10 h-16 rounded-2xl"
                         >
-                            {loading ? <ActivityIndicator color="white" /> : (
-                                <View className="flex-row items-center">
-                                    <Text className="text-white font-sans-bold text-base mr-2">Confirm Order</Text>
-                                    <ArrowRight color="white" size={18} />
-                                </View>
-                            )}
+                            <Text className="text-white font-sans-bold text-lg">{loading ? 'Saving...' : 'Save Order'}</Text>
                         </Button>
-
                     </ScrollView>
                 </KeyboardAvoidingView>
+
+                {/* Suggestions Overlay */}
+                {suggestions.data.length > 0 && (
+                    <View
+                        className="absolute bg-white border border-divider rounded-2xl shadow-xl z-50 p-2"
+                        style={{ top: 150, left: 24, right: 24, maxHeight: 200 }}
+                    >
+                        <ScrollView>
+                            {suggestions.data.map((item, idx) => (
+                                <TouchableOpacity
+                                    key={idx}
+                                    onPress={() => selectSuggestion(item)}
+                                    className="p-3 border-b border-divider last:border-0"
+                                >
+                                    <Text className="text-primary font-sans-medium">{item.name}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
             </SafeAreaView>
-
-            <ConfirmDialog
-                visible={successDialogVisible}
-                title="Order Booked!"
-                message="Transaction has been saved and ledger entries updated."
-                confirmText="Great"
-                onConfirm={() => { setSuccessDialogVisible(false); navigation.navigate('HomeTab' as never); }}
-                onCancel={() => setSuccessDialogVisible(false)}
-            />
-
-            <ConfirmDialog
-                visible={!!validationError}
-                title="Check Details"
-                message={validationError || ''}
-                confirmText="Understand"
-                onConfirm={() => setValidationError(null)}
-                onCancel={() => setValidationError(null)}
-            />
         </Background>
     );
 }

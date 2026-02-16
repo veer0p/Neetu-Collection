@@ -1,50 +1,43 @@
 import React from 'react';
-import { View, Platform } from 'react-native';
+import { View, TouchableOpacity, Text as RNText } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { LayoutDashboard, PlusCircle, Wallet, History, Contact2, BarChart3 } from 'lucide-react-native';
+import { Home, ClipboardList, Plus, BookOpen, MoreHorizontal } from 'lucide-react-native';
 import Dashboard from '../screens/Dashboard';
 import AddEntry from '../screens/AddEntry';
 import Transactions from '../screens/Transactions';
-import Udhar from '../screens/Udhar';
-import Reports from '../screens/Reports';
-import Directory from '../screens/Directory';
-import Accounts from '../screens/Accounts';
+import Ledger from '../screens/Ledger';
+import More from '../screens/More';
 import AccountDetail from '../screens/AccountDetail';
+import OrderDetail from '../screens/OrderDetail';
+import Directory from '../screens/Directory';
+import Reports from '../screens/Reports';
+import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 
-import { TouchableOpacity, Text as RNText } from 'react-native';
-
 const CustomTabBar = ({ state, descriptors, navigation }: any) => {
+    const { isDark } = useTheme();
+    const visibleTabs = ['HomeTab', 'Orders', 'Add', 'Ledger', 'More'];
+
     return (
         <View style={{
-            position: 'absolute',
-            bottom: 25,
-            left: '10%',
-            right: '10%',
             flexDirection: 'row',
-            backgroundColor: '#1e293b',
-            height: 65,
-            borderRadius: 35,
+            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+            height: 70,
             alignItems: 'center',
             justifyContent: 'space-around',
-            paddingHorizontal: 10,
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.1)',
-            elevation: 10,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 5 },
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
+            paddingHorizontal: 8,
+            borderTopWidth: 1,
+            borderTopColor: isDark ? '#334155' : '#F0F0F5',
+            paddingBottom: 8,
         }}>
             {state.routes.map((route: any, index: number) => {
+                if (!visibleTabs.includes(route.name)) return null;
+
                 const { options } = descriptors[route.key];
-                const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
-
-                // Only show Home, Add, Accounts, Udhar, History (Orders)
-                if (['Directory', 'Insights', 'AccountDetail'].includes(route.name)) return null;
-
+                const label = options.tabBarLabel || route.name;
                 const isFocused = state.index === index;
+                const isCenter = route.name === 'Add';
 
                 const onPress = () => {
                     const event = navigation.emit({
@@ -52,65 +45,54 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                         target: route.key,
                         canPreventDefault: true,
                     });
-
                     if (!isFocused && !event.defaultPrevented) {
                         navigation.navigate(route.name);
                     }
                 };
 
-                const onLongPress = () => {
-                    navigation.emit({
-                        type: 'tabLongPress',
-                        target: route.key,
-                    });
-                };
+                if (isCenter) {
+                    return (
+                        <TouchableOpacity
+                            key={index}
+                            onPress={onPress}
+                            activeOpacity={0.8}
+                            style={{
+                                width: 52,
+                                height: 52,
+                                borderRadius: 16,
+                                backgroundColor: '#4F46E5',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginTop: -20,
+                                elevation: 4,
+                                shadowColor: '#4F46E5',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.3,
+                                shadowRadius: 8,
+                            }}
+                        >
+                            <Plus color="#FFFFFF" size={26} />
+                        </TouchableOpacity>
+                    );
+                }
 
-                const color = isFocused ? '#6366f1' : '#94a3b8';
-
-                const isCenter = index === 2; // Center item (Add Sale)
+                const color = isFocused ? '#6366F1' : (isDark ? '#94A3B8' : '#9CA3AF');
 
                 return (
                     <TouchableOpacity
                         key={index}
-                        accessibilityState={isFocused ? { selected: true } : {}}
-                        accessibilityLabel={options.tabBarAccessibilityLabel}
-                        testID={options.tabBarTestID}
                         onPress={onPress}
-                        onLongPress={onLongPress}
-                        style={{
-                            alignItems: 'center',
-                            flex: 1,
-                            justifyContent: isCenter ? 'flex-start' : 'center',
-                            top: isCenter ? -20 : 0
-                        }}
+                        style={{ alignItems: 'center', flex: 1, justifyContent: 'center', paddingTop: 8 }}
                     >
-                        <View style={isCenter ? {
-                            width: 50,
-                            height: 50,
-                            borderRadius: 25,
-                            backgroundColor: '#6366f1',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            elevation: 5,
-                            shadowColor: '#6366f1',
-                            shadowOffset: { width: 0, height: 4 },
-                            shadowOpacity: 0.3,
-                            shadowRadius: 4,
-                        } : {
-                            alignItems: 'center'
+                        {options.tabBarIcon?.({ focused: isFocused, color, size: 22 })}
+                        <RNText style={{
+                            color,
+                            fontSize: 11,
+                            fontFamily: isFocused ? 'PlusJakartaSans_600SemiBold' : 'PlusJakartaSans_400Regular',
+                            marginTop: 4,
                         }}>
-                            {options.tabBarIcon ? options.tabBarIcon({ focused: isFocused, color: isCenter ? 'white' : color, size: isCenter ? 28 : 24 }) : null}
-                        </View>
-                        {!isCenter && (
-                            <RNText style={{
-                                color,
-                                fontSize: 10,
-                                fontFamily: 'PlusJakartaSans_600SemiBold',
-                                marginTop: 2
-                            }}>
-                                {label}
-                            </RNText>
-                        )}
+                            {label}
+                        </RNText>
                     </TouchableOpacity>
                 );
             })}
@@ -121,24 +103,22 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
 export const MainTabs = ({ user, onLogout }: { user: any, onLogout: () => void }) => (
     <Tab.Navigator
         tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{
-            headerShown: false,
-        }}
+        screenOptions={{ headerShown: false }}
     >
         <Tab.Screen
             name="HomeTab"
             options={{
-                tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={22} />,
-                tabBarLabel: 'Home'
+                tabBarIcon: ({ color }) => <Home color={color} size={22} />,
+                tabBarLabel: 'Home',
             }}
         >
             {(props: any) => <Dashboard {...props} user={user} onLogout={onLogout} />}
         </Tab.Screen>
         <Tab.Screen
-            name="History"
+            name="Orders"
             component={Transactions}
             options={{
-                tabBarIcon: ({ color }) => <History color={color} size={22} />,
+                tabBarIcon: ({ color }) => <ClipboardList color={color} size={22} />,
                 tabBarLabel: 'Orders',
             }}
         />
@@ -146,50 +126,33 @@ export const MainTabs = ({ user, onLogout }: { user: any, onLogout: () => void }
             name="Add"
             component={AddEntry}
             options={{
-                tabBarIcon: ({ color }) => (
-                    <View className="mb-0">
-                        <PlusCircle color={color} size={30} />
-                    </View>
-                ),
+                tabBarIcon: ({ color }) => <Plus color={color} size={26} />,
                 tabBarLabel: 'Add',
             }}
         />
         <Tab.Screen
-            name="Udhar"
-            component={Udhar}
+            name="Ledger"
+            component={Ledger}
             options={{
-                tabBarIcon: ({ color }) => <Wallet color={color} size={22} />,
-                tabBarLabel: 'Udhar'
+                tabBarIcon: ({ color }) => <BookOpen color={color} size={22} />,
+                tabBarLabel: 'Ledger',
             }}
         />
         <Tab.Screen
-            name="Accounts"
-            component={Accounts}
+            name="More"
             options={{
-                tabBarIcon: ({ color }) => <Contact2 color={color} size={22} />,
-                tabBarLabel: 'Accounts'
+                tabBarIcon: ({ color }) => <MoreHorizontal color={color} size={22} />,
+                tabBarLabel: 'More',
             }}
-        />
-        <Tab.Screen
-            name="AccountDetail"
-            component={AccountDetail}
-            options={{
-                tabBarButton: () => null,
-            }}
-        />
-        <Tab.Screen
-            name="Directory"
-            component={Directory}
-            options={{
-                tabBarButton: () => null,
-            }}
-        />
-        <Tab.Screen
-            name="Insights"
-            component={Reports}
-            options={{
-                tabBarButton: () => null,
-            }}
-        />
+        >
+            {(props: any) => <More {...props} user={user} onLogout={onLogout} />}
+        </Tab.Screen>
+
+        {/* Hidden screens (no tab bar button) */}
+        <Tab.Screen name="AccountDetail" component={AccountDetail} options={{ tabBarButton: () => null }} />
+        <Tab.Screen name="OrderDetail" component={OrderDetail} options={{ tabBarButton: () => null }} />
+        <Tab.Screen name="Directory" component={Directory} options={{ tabBarButton: () => null }} />
+        <Tab.Screen name="Insights" component={Reports} options={{ tabBarButton: () => null }} />
+        <Tab.Screen name="AddEntry" component={AddEntry} options={{ tabBarButton: () => null }} />
     </Tab.Navigator>
 );

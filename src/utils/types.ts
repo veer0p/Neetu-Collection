@@ -20,6 +20,7 @@ export interface Transaction {
     notes?: string;
     createdAt: number;
 }
+export type OrderStatus = 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
 
 export interface Order {
     id: string;
@@ -55,7 +56,7 @@ export interface LedgerEntry {
     orderId?: string;
     personId: string;
     amount: number; // Positive = Credit (owing/received), Negative = Debit (owed/paid)
-    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Reimbursement' | 'ServiceFee';
+    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Reimbursement' | 'Expense';
     notes?: string;
     orderProductName?: string; // Joined from orders
     orderStatus?: string;      // Joined from orders

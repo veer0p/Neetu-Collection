@@ -90,6 +90,7 @@ export const supabaseService = {
 
     async saveOrder(order: Partial<Order>, userId: string): Promise<void> {
         const isUpdate = !!order.id;
+        const margin = (order.sellingPrice || 0) - (order.originalPrice || 0) - (order.pickupCharges || 0) - (order.shippingCharges || 0);
         const orderPayload = {
             user_id: userId,
             date: order.date,
@@ -99,7 +100,7 @@ export const supabaseService = {
             original_price: order.originalPrice,
             selling_price: order.sellingPrice,
             paid_by_driver: order.paidByDriver || false,
-            pickup_person_id: order.pickupPersonId,
+            pickup_person_id: order.pickupPersonId || null,
             tracking_id: order.trackingId,
             courier_name: order.courierName,
             pickup_charges: order.pickupCharges || 0,
@@ -109,7 +110,7 @@ export const supabaseService = {
             vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
             customer_payment_status: order.customerPaymentStatus || 'Udhar',
             pickup_payment_status: order.pickupPaymentStatus || 'Paid',
-            margin: order.margin || 0,
+            margin,
         };
 
         let savedOrder;
@@ -132,278 +133,250 @@ export const supabaseService = {
             savedOrder = data;
         }
 
-        if (!isUpdate) {
-            const ledgerEntries = [];
-            ledgerEntries.push({
-                user_id: userId,
-                order_id: savedOrder.id,
-                person_id: order.customerId,
-                amount: order.sellingPrice || 0,
-                transaction_type: 'Sale'
-            });
-
-            ledgerEntries.push({
-                user_id: userId,
-                order_id: savedOrder.id,
-                person_id: order.vendorId,
-                amount: -(order.originalPrice || 0),
-                transaction_type: 'Purchase'
-            });
-
-            if (order.paidByDriver && order.pickupPersonId) {
-                ledgerEntries.push({
-                    user_id: userId,
-                    order_id: savedOrder.id,
-                    person_id: order.pickupPersonId,
-                    amount: -(order.originalPrice || 0),
-                    transaction_type: 'Reimbursement',
-                    notes: 'Item price reimbursement'
-                });
-            }
-
-            if (order.pickupPersonId && order.pickupCharges && order.pickupCharges > 0) {
-                ledgerEntries.push({
-                    user_id: userId,
-                    order_id: savedOrder.id,
-                    person_id: order.pickupPersonId,
-                    amount: order.pickupCharges,
-                    transaction_type: 'ServiceFee',
-                    notes: 'Pickup service charge'
-                });
-            }
-
-            if (order.shippingCharges && order.shippingCharges > 0) {
-                ledgerEntries.push({
-                    user_id: userId,
-                    order_id: savedOrder.id,
-                    person_id: order.vendorId,
-                    amount: -(order.shippingCharges || 0),
-                    transaction_type: 'Purchase',
-                    notes: 'Shipping Charges'
-                });
-            }
-
-            if (order.customerPaymentStatus === 'Paid') {
-                ledgerEntries.push({
-                    user_id: userId,
-                    order_id: savedOrder.id,
-                    person_id: order.customerId,
-                    amount: -(order.sellingPrice || 0),
-                    transaction_type: 'PaymentIn'
-                });
-            }
-
-            if (order.paidByDriver || order.vendorPaymentStatus === 'Paid') {
-                ledgerEntries.push({
-                    user_id: userId,
-                    order_id: savedOrder.id,
-                    person_id: order.vendorId,
-                    amount: order.originalPrice || 0,
-                    transaction_type: 'PaymentOut',
-                    notes: order.paidByDriver ? 'Paid by Driver' : 'Paid at Shop'
-                });
-            }
-
-            if (order.paidByDriver && order.pickupPersonId && order.pickupPaymentStatus === 'Paid') {
-                ledgerEntries.push({
-                    user_id: userId,
-                    order_id: savedOrder.id,
-                    person_id: order.pickupPersonId,
-                    amount: order.originalPrice || 0,
-                    transaction_type: 'PaymentOut',
-                    notes: 'Reimbursed immediately'
-                });
-            }
-
-            const { error: ledgerError } = await supabase
+        // === DELETE-AND-RECREATE: Always rebuild ledger for this order ===
+        if (isUpdate) {
+            const { error: deleteError } = await supabase
                 .from('ledger')
-                .insert(ledgerEntries);
-
-            if (ledgerError) throw ledgerError;
+                .delete()
+                .eq('order_id', savedOrder.id);
+            if (deleteError) throw deleteError;
         }
+
+        if (order.status === 'Canceled') return;
+
+        const ledgerEntries: any[] = [];
+        const orderId = savedOrder.id;
+        const hasPickupPerson = !!order.pickupPersonId;
+        const originalPrice = order.originalPrice || 0;
+        const sellingPrice = order.sellingPrice || 0;
+        const pickupCharges = order.pickupCharges || 0;
+        const shippingCharges = order.shippingCharges || 0;
+        const paidByDriver = order.paidByDriver || false;
+
+        ledgerEntries.push({
+            user_id: userId, order_id: orderId, person_id: order.customerId,
+            amount: sellingPrice, transaction_type: 'Sale',
+        });
+        ledgerEntries.push({
+            user_id: userId, order_id: orderId, person_id: order.vendorId,
+            amount: -originalPrice, transaction_type: 'Purchase',
+        });
+        if (!hasPickupPerson && shippingCharges > 0) {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.vendorId,
+                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges',
+            });
+        }
+        if (hasPickupPerson && pickupCharges > 0) {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                amount: -pickupCharges, transaction_type: 'Expense', notes: 'Pickup charges',
+            });
+        }
+        if (hasPickupPerson && shippingCharges > 0) {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges',
+            });
+        }
+        if (paidByDriver && hasPickupPerson) {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.vendorId,
+                amount: originalPrice, transaction_type: 'PaymentOut', notes: 'Paid by driver',
+            });
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                amount: -originalPrice, transaction_type: 'Reimbursement', notes: 'Product cost reimbursement',
+            });
+        }
+        if (order.customerPaymentStatus === 'Paid') {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.customerId,
+                amount: -sellingPrice, transaction_type: 'PaymentIn',
+            });
+        }
+        if (order.vendorPaymentStatus === 'Paid' && !paidByDriver) {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.vendorId,
+                amount: originalPrice, transaction_type: 'PaymentOut',
+            });
+            if (!hasPickupPerson && shippingCharges > 0) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.vendorId,
+                    amount: shippingCharges, transaction_type: 'PaymentOut', notes: 'Shipping settled',
+                });
+            }
+        }
+        if (order.pickupPaymentStatus === 'Paid' && hasPickupPerson) {
+            if (pickupCharges > 0) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    amount: pickupCharges, transaction_type: 'PaymentOut', notes: 'Pickup settled',
+                });
+            }
+            if (shippingCharges > 0) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    amount: shippingCharges, transaction_type: 'PaymentOut', notes: 'Shipping settled',
+                });
+            }
+            if (paidByDriver) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    amount: originalPrice, transaction_type: 'PaymentOut', notes: 'Product cost reimbursed',
+                });
+            }
+        }
+        const { error: ledgerError } = await supabase.from('ledger').insert(ledgerEntries);
+        if (ledgerError) throw ledgerError;
     },
 
     async getLedgerEntries(personId: string): Promise<LedgerEntry[]> {
         const { data, error } = await supabase
             .from('ledger')
-            .select(`
-                *,
-                order:orders(product_id, product:directory!product_id(name), status)
-            `)
+            .select('*, order:orders(product:directory!product_id(name), status)')
             .eq('person_id', personId)
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error('Error fetching ledger:', error);
-            return [];
-        }
-
+        if (error) return [];
         return (data || []).map((item: any) => ({
-            id: item.id,
-            userId: item.user_id,
-            orderId: item.order_id,
-            personId: item.person_id,
-            amount: Number(item.amount),
-            transactionType: item.transaction_type as any,
-            notes: item.notes,
-            orderProductName: item.order?.product?.name,
-            orderStatus: item.order?.status,
+            id: item.id, userId: item.user_id, orderId: item.order_id, personId: item.person_id,
+            amount: Number(item.amount), transactionType: item.transaction_type as any, notes: item.notes,
+            orderProductName: item.order?.product?.name, orderStatus: item.order?.status,
             createdAt: new Date(item.created_at).getTime(),
         })) as LedgerEntry[];
     },
 
-    async addPayment(entry: Partial<LedgerEntry>, userId: string): Promise<void> {
-        const { error } = await supabase
+    async getLedgerEntriesByOrder(orderId: string): Promise<(LedgerEntry & { personName?: string })[]> {
+        const { data, error } = await supabase
             .from('ledger')
-            .insert([{
-                user_id: userId,
-                person_id: entry.personId,
-                amount: entry.amount,
-                transaction_type: entry.transactionType,
-                notes: entry.notes
-            }]);
+            .select('*, person:directory!person_id(name)')
+            .eq('order_id', orderId)
+            .order('created_at', { ascending: true });
 
+        if (error) return [];
+        return (data || []).map((item: any) => ({
+            id: item.id, userId: item.user_id, orderId: item.order_id, personId: item.person_id,
+            personName: item.person?.name, amount: Number(item.amount),
+            transactionType: item.transaction_type as any, notes: item.notes,
+            createdAt: new Date(item.created_at).getTime(),
+        }));
+    },
+
+    async addPayment(entry: Partial<LedgerEntry>, userId: string): Promise<void> {
+        const { error } = await supabase.from('ledger').insert([{
+            user_id: userId, person_id: entry.personId, amount: entry.amount,
+            transaction_type: entry.transactionType, notes: entry.notes
+        }]);
+        if (error) throw error;
+    },
+
+    async updateOrderPaymentStatus(orderId: string, field: 'vendor' | 'customer' | 'pickup', status: 'Paid' | 'Udhar'): Promise<void> {
+        const fieldMap: Record<string, string> = { vendor: 'vendor_payment_status', customer: 'customer_payment_status', pickup: 'pickup_payment_status' };
+        const { error: updateError } = await supabase.from('orders').update({ [fieldMap[field]]: status }).eq('id', orderId);
+        if (updateError) throw updateError;
+        const { data: fullOrder, error: fetchError } = await supabase.from('orders').select('*').eq('id', orderId).single();
+        if (fetchError) throw fetchError;
+        await this.saveOrder({
+            id: fullOrder.id, date: fullOrder.date, productId: fullOrder.product_id, customerId: fullOrder.customer_id, vendorId: fullOrder.vendor_id,
+            originalPrice: Number(fullOrder.original_price), sellingPrice: Number(fullOrder.selling_price),
+            paidByDriver: fullOrder.paid_by_driver, pickupPersonId: fullOrder.pickup_person_id,
+            trackingId: fullOrder.tracking_id, courierName: fullOrder.courier_name,
+            pickupCharges: Number(fullOrder.pickup_charges), shippingCharges: Number(fullOrder.shipping_charges),
+            status: fullOrder.status, notes: fullOrder.notes,
+            vendorPaymentStatus: fullOrder.vendor_payment_status, customerPaymentStatus: fullOrder.customer_payment_status, pickupPaymentStatus: fullOrder.pickup_payment_status,
+        }, fullOrder.user_id);
+    },
+
+    async updateLedgerEntry(id: string, notes: string): Promise<void> {
+        const { error } = await supabase.from('ledger').update({ notes }).eq('id', id);
         if (error) throw error;
     },
 
     async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
         const { data: directoryData, error: directoryError } = await supabase
-            .from('directory')
-            .select(`
-                *,
-                ledger:ledger(amount)
-            `)
-            .eq('user_id', userId);
-
-        if (directoryError) {
-            console.error('Error fetching directory with balances:', directoryError);
-            return [];
-        }
-
-        return (directoryData || []).map((item: any) => {
-            const balance = (item.ledger || []).reduce((acc: number, l: any) => acc + Number(l.amount), 0);
-            return {
-                ...item,
-                balance,
-                createdAt: new Date(item.created_at).getTime()
-            };
-        }) as DirectoryItem[];
+            .from('directory').select('*, ledger:ledger(amount)').eq('user_id', userId);
+        if (directoryError) return [];
+        return (directoryData || []).map((item: any) => ({
+            ...item, balance: (item.ledger || []).reduce((acc: number, l: any) => acc + Number(l.amount), 0),
+            createdAt: new Date(item.created_at).getTime()
+        })) as DirectoryItem[];
     },
 
     async getTransactions(userId: string): Promise<Transaction[]> {
         const { data: orders, error } = await supabase
-            .from('orders')
-            .select(`
-                *,
-                customer:directory!customer_id(name),
-                product:directory!product_id(name),
-                vendor:directory!vendor_id(name),
-                pickup_person:directory!pickup_person_id(name)
-            `)
-            .eq('user_id', userId)
-            .order('date', { ascending: false });
-
-        if (error) {
-            console.error('Error fetching transactions:', error);
-            return [];
-        }
-
+            .from('orders').select('*, customer:directory!customer_id(name), product:directory!product_id(name), vendor:directory!vendor_id(name), pickup_person:directory!pickup_person_id(name)')
+            .eq('user_id', userId).order('date', { ascending: false });
+        if (error) return [];
         return (orders || []).map((o: any) => {
-            const { margin, percentage } = calculateMargin(
-                Number(o.original_price),
-                Number(o.selling_price),
-                Number(o.pickup_charges),
-                Number(o.shipping_charges)
-            );
-
+            const { margin, percentage } = calculateMargin(Number(o.original_price), Number(o.selling_price), Number(o.pickup_charges), Number(o.shipping_charges));
             return {
-                id: o.id,
-                date: o.date,
-                customerName: o.customer?.name || 'Unknown',
-                vendorName: o.vendor?.name || 'Unknown',
-                productName: o.product?.name || 'Unknown',
-                originalPrice: Number(o.original_price),
-                sellingPrice: Number(o.selling_price),
-                margin,
-                marginPercentage: percentage,
-                vendorPaymentStatus: o.vendor_payment_status,
-                customerPaymentStatus: o.customer_payment_status,
-                pickupPaymentStatus: o.pickup_payment_status,
-                pickupPersonName: o.pickup_person?.name,
-                trackingId: o.tracking_id,
-                courierName: o.courier_name,
-                pickupCharges: Number(o.pickup_charges),
-                shippingCharges: Number(o.shipping_charges),
-                status: o.status,
-                notes: o.notes,
-                createdAt: new Date(o.created_at).getTime(),
+                id: o.id, date: o.date, customerName: o.customer?.name || 'Unknown', vendorName: o.vendor?.name || 'Unknown', productName: o.product?.name || 'Unknown',
+                originalPrice: Number(o.original_price), sellingPrice: Number(o.selling_price),
+                margin, marginPercentage: percentage, vendorPaymentStatus: o.vendor_payment_status, customerPaymentStatus: o.customer_payment_status,
+                pickupPaymentStatus: o.pickup_payment_status, pickupPersonName: o.pickup_person?.name,
+                trackingId: o.tracking_id, courierName: o.courier_name, pickupCharges: Number(o.pickup_charges), shippingCharges: Number(o.shipping_charges),
+                status: o.status, notes: o.notes, createdAt: new Date(o.created_at).getTime(),
             };
         }) as Transaction[];
     },
 
     async getDirectory(userId: string): Promise<DirectoryItem[]> {
-        const { data, error } = await supabase
-            .from('directory')
-            .select('*')
-            .eq('user_id', userId)
-            .order('name');
-
-        if (error) {
-            console.error('Error fetching directory:', error);
-            return [];
-        }
-
-        return (data || []).map((item: any) => ({
-            ...item,
-            createdAt: new Date(item.created_at).getTime()
-        })) as DirectoryItem[];
+        const { data, error } = await supabase.from('directory').select('*').eq('user_id', userId).order('name');
+        if (error) return [];
+        return (data || []).map((item: any) => ({ ...item, createdAt: new Date(item.created_at).getTime() })) as DirectoryItem[];
     },
 
     async saveDirectoryItem(item: Partial<DirectoryItem>, userId: string): Promise<void> {
-        const isUpdate = !!item.id;
-        const payload = {
-            user_id: userId,
-            name: item.name,
-            type: item.type,
-            address: item.address,
-            phone: item.phone,
-        };
-
-        if (isUpdate) {
-            const { error } = await supabase
-                .from('directory')
-                .update(payload)
-                .eq('id', item.id);
-            if (error) throw error;
-        } else {
-            const { error } = await supabase
-                .from('directory')
-                .insert([payload]);
-            if (error) throw error;
-        }
-    },
-
-    async deleteDirectoryItem(id: string): Promise<void> {
-        const { error } = await supabase
-            .from('directory')
-            .delete()
-            .eq('id', id);
+        const payload = { user_id: userId, name: item.name, type: item.type, address: item.address, phone: item.phone };
+        const { error } = item.id ? await supabase.from('directory').update(payload).eq('id', item.id) : await supabase.from('directory').insert([payload]);
         if (error) throw error;
     },
 
+    async deleteDirectoryItem(id: string): Promise<void> {
+        const { error } = await supabase.from('directory').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async deleteOrder(orderId: string): Promise<void> {
+        const { error } = await supabase.from('orders').delete().eq('id', orderId);
+        if (error) throw error;
+    },
+
+    async updateOrderStatus(orderId: string, status: string): Promise<void> {
+        const { data: order, error: fetchError } = await supabase
+            .from('orders')
+            .select('*, product:directory!product_id(name), customer:directory!customer_id(name), vendor:directory!vendor_id(name), pickup_person:directory!pickup_person_id(name)')
+            .eq('id', orderId).single();
+        if (fetchError) throw fetchError;
+        const orderData: Order = {
+            id: order.id, userId: order.user_id, date: order.date, productId: order.product_id, productName: order.product?.name || 'Unknown',
+            customerId: order.customer_id, customerName: order.customer?.name || 'Unknown', vendorId: order.vendor_id, vendorName: order.vendor?.name || 'Unknown',
+            originalPrice: Number(order.original_price), sellingPrice: Number(order.selling_price), margin: Number(order.margin),
+            paidByDriver: order.paid_by_driver, pickupPersonId: order.pickup_person_id, pickupPersonName: order.pickup_person?.name,
+            trackingId: order.tracking_id, courierName: order.courier_name, pickupCharges: Number(order.pickup_charges), shippingCharges: Number(order.shipping_charges),
+            status: status as any, notes: order.notes, customerPaymentStatus: order.customer_payment_status, vendorPaymentStatus: order.vendor_payment_status,
+            pickupPaymentStatus: order.pickup_payment_status, createdAt: new Date(order.created_at).getTime(),
+        };
+        await this.saveOrder(orderData, order.user_id);
+    },
+
     async getContactsByType(userId: string, type: 'Customer' | 'Vendor' | 'Product' | 'Pickup Person') {
-        const { data, error } = await supabase
-            .from('directory')
-            .select('id, name')
-            .eq('user_id', userId)
-            .eq('type', type)
-            .order('name');
-
-        if (error) {
-            console.error(`Error fetching ${type}:`, error);
-            return [];
-        }
-
+        const { data, error } = await supabase.from('directory').select('id, name').eq('user_id', userId).eq('type', type).order('name');
+        if (error) return [];
         return data || [];
+    },
+
+    async getProducts(): Promise<any[]> {
+        const { data, error } = await supabase.from('directory').select('*').eq('type', 'Product').order('name');
+        return error ? [] : data;
+    },
+
+    async addDirectoryItem(item: any, userId: string): Promise<void> {
+        await this.saveDirectoryItem(item, userId);
+    },
+
+    async updateDirectoryItem(id: string, item: any): Promise<void> {
+        await this.saveDirectoryItem({ ...item, id }, item.user_id);
     },
 };

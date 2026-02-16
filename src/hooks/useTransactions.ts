@@ -54,6 +54,40 @@ export const useTransactions = () => {
         totalOrders: orders.length,
     };
 
+    const updatePaymentStatus = useCallback(async (
+        orderId: string,
+        target: 'vendor' | 'customer' | 'pickup',
+        status: 'Paid' | 'Udhar'
+    ) => {
+        try {
+            await supabaseService.updateOrderPaymentStatus(orderId, target, status);
+            await fetchData();
+        } catch (error) {
+            console.error('Error updating payment status:', error);
+            throw error;
+        }
+    }, [fetchData]);
+
+    const deleteOrder = useCallback(async (orderId: string) => {
+        try {
+            await supabaseService.deleteOrder(orderId);
+            await fetchData();
+        } catch (error) {
+            console.error('Error deleting order:', error);
+            throw error;
+        }
+    }, [fetchData]);
+
+    const updateOrderStatus = useCallback(async (orderId: string, status: string) => {
+        try {
+            await supabaseService.updateOrderStatus(orderId, status);
+            await fetchData();
+        } catch (error) {
+            console.error('Error updating order status:', error);
+            throw error;
+        }
+    }, [fetchData]);
+
     return {
         transactions: orders as any, // Cast for legacy component compatibility
         orders,
@@ -62,5 +96,8 @@ export const useTransactions = () => {
         userId,
         stats,
         refresh: fetchData,
+        updatePaymentStatus,
+        deleteOrder,
+        updateOrderStatus,
     };
 };

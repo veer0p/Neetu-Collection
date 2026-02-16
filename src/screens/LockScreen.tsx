@@ -14,19 +14,13 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     const [error, setError] = useState(false);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            handleAuthentication();
-        }, 500);
+        const timer = setTimeout(() => { handleAuthentication(); }, 500);
         return () => clearTimeout(timer);
     }, []);
 
     const handleAuthentication = async () => {
         const success = await authenticate();
-        if (success) {
-            onUnlock();
-        } else {
-            setError(true);
-        }
+        if (success) { onUnlock(); } else { setError(true); }
     };
 
     return (
@@ -38,41 +32,33 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
                     transition={{ type: 'spring', duration: 1000 }}
                     className="items-center"
                 >
-                    <View className="w-24 h-24 bg-indigo-500/20 rounded-full items-center justify-center border border-indigo-500/30 mb-8">
-                        <Lock color="#818cf8" size={40} />
+                    <View className="w-24 h-24 bg-accent/10 rounded-full items-center justify-center mb-8">
+                        <Lock color="#4F46E5" size={40} />
                     </View>
 
-                    <Text className="text-white font-sans-bold text-3xl text-center mb-2">
-                        App Locked
-                    </Text>
-                    <Text className="text-gray-400 font-sans text-center mb-12">
-                        Please authenticate to access your collection records securely.
+                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-3xl text-center mb-2">App Locked</Text>
+                    <Text className="text-secondary dark:text-secondary-dark font-sans text-center mb-12">
+                        Authenticate to access your collection records securely.
                     </Text>
 
                     <TouchableOpacity
                         onPress={handleAuthentication}
-                        className="bg-indigo-600 px-8 py-4 rounded-2xl flex-row items-center gap-3 active:bg-indigo-700 shadow-lg shadow-indigo-500/50"
+                        className="bg-accent px-8 py-4 rounded-2xl flex-row items-center gap-3"
                     >
                         <Fingerprint color="white" size={24} />
                         <Text className="text-white font-sans-bold text-lg">Use Biometrics</Text>
                     </TouchableOpacity>
 
                     {error && (
-                        <MotiView
-                            from={{ opacity: 0, translateY: 10 }}
-                            animate={{ opacity: 1, translateY: 0 }}
-                            className="mt-6"
-                        >
-                            <Text className="text-red-400 font-sans-medium">Authentication failed. Try again.</Text>
+                        <MotiView from={{ opacity: 0, translateY: 10 }} animate={{ opacity: 1, translateY: 0 }} className="mt-6">
+                            <Text className="text-danger font-sans-semibold">Authentication failed. Try again.</Text>
                         </MotiView>
                     )}
                 </MotiView>
 
                 <View className="absolute bottom-12 flex-row items-center gap-2 opacity-40">
-                    <ShieldCheck color="#94a3b8" size={16} />
-                    <Text className="text-gray-400 font-sans text-xs uppercase tracking-widest">
-                        End-to-end encrypted
-                    </Text>
+                    <ShieldCheck color="#9CA3AF" size={16} />
+                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-widest">Secured</Text>
                 </View>
             </View>
         </Background>

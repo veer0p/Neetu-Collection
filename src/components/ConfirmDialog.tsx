@@ -1,7 +1,8 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { AlertTriangle, HelpCircle, CheckCircle2 } from 'lucide-react-native';
+import { useTheme } from '../context/ThemeContext';
+import { cn } from '../utils/cn';
 
 interface ConfirmDialogProps {
     visible: boolean;
@@ -12,6 +13,7 @@ interface ConfirmDialogProps {
     confirmText?: string;
     cancelText?: string;
     type?: 'danger' | 'info' | 'warning' | 'success';
+    loading?: boolean;
 }
 
 export const ConfirmDialog = ({
@@ -22,14 +24,17 @@ export const ConfirmDialog = ({
     onCancel,
     confirmText = 'Confirm',
     cancelText = 'Cancel',
-    type = 'info'
+    type = 'info',
+    loading = false
 }: ConfirmDialogProps) => {
+    const { isDark } = useTheme();
+
     const getIcon = () => {
         switch (type) {
-            case 'danger': return <AlertTriangle color="#f87171" size={32} />;
-            case 'warning': return <AlertTriangle color="#fbbf24" size={32} />;
-            case 'success': return <CheckCircle2 color="#10b981" size={32} />;
-            default: return <HelpCircle color="#6366f1" size={32} />;
+            case 'danger': return <AlertTriangle color="#EF4444" size={32} />;
+            case 'warning': return <AlertTriangle color="#F59E0B" size={32} />;
+            case 'success': return <CheckCircle2 color="#10B981" size={32} />;
+            default: return <HelpCircle color="#4F46E5" size={32} />;
         }
     };
 
@@ -37,145 +42,48 @@ export const ConfirmDialog = ({
     const isSuccess = type === 'success';
 
     return (
-        <Modal
-            transparent
-            visible={visible}
-            animationType="fade"
-            onRequestClose={onCancel}
-            statusBarTranslucent
-        >
-            <View style={styles.overlay}>
-                <View style={styles.container}>
-                    <View style={styles.cardWrapper}>
-                        <BlurView intensity={80} tint="dark" style={styles.blurContent}>
-                            <View style={styles.content}>
-                                <View style={[
-                                    styles.iconContainer,
-                                    { backgroundColor: isDanger ? 'rgba(239, 68, 68, 0.1)' : isSuccess ? 'rgba(16, 185, 129, 0.1)' : 'rgba(99, 102, 241, 0.1)' }
-                                ]}>
-                                    {getIcon()}
-                                </View>
+        <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
+            <View className="flex-1 bg-black/50 justify-center items-center px-6">
+                <View className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[32px] p-6 items-center shadow-xl">
+                    <View className={cn(
+                        "p-4 rounded-full mb-4",
+                        isDanger ? 'bg-danger/10' : isSuccess ? 'bg-success/10' : 'bg-accent/10'
+                    )}>
+                        {getIcon()}
+                    </View>
 
-                                <Text style={styles.titleText}>{title}</Text>
-                                <Text style={styles.messageText}>{message}</Text>
+                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl text-center">{title}</Text>
+                    <Text className="text-secondary dark:text-secondary-dark font-sans text-sm text-center mt-2 leading-5">
+                        {message}
+                    </Text>
 
-                                <View style={styles.buttonRow}>
-                                    {cancelText !== "" && (
-                                        <TouchableOpacity
-                                            onPress={onCancel}
-                                            style={styles.cancelButton}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={styles.cancelButtonText}>{cancelText}</Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    <TouchableOpacity
-                                        onPress={onConfirm}
-                                        style={[
-                                            styles.confirmButton,
-                                            { backgroundColor: isDanger ? '#ef4444' : isSuccess ? '#10b981' : '#6366f1' }
-                                        ]}
-                                        activeOpacity={0.8}
-                                    >
-                                        <Text style={styles.confirmButtonText}>{confirmText}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </BlurView>
+                    <View className="flex-row gap-3 mt-8 w-full">
+                        {cancelText !== "" && (
+                            <TouchableOpacity
+                                onPress={onCancel}
+                                disabled={loading}
+                                className="flex-1 h-14 bg-surface dark:bg-background-dark border border-divider dark:border-divider-dark rounded-2xl items-center justify-center"
+                            >
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-base">{cancelText}</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            onPress={onConfirm}
+                            disabled={loading}
+                            className={cn(
+                                "flex-1 h-14 rounded-2xl items-center justify-center",
+                                isDanger ? 'bg-danger' : isSuccess ? 'bg-success' : 'bg-accent'
+                            )}
+                        >
+                            {loading ? (
+                                <ActivityIndicator color="white" size="small" />
+                            ) : (
+                                <Text className="text-white font-sans-bold text-base">{confirmText}</Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
             </View>
         </Modal>
     );
 };
-
-const styles = StyleSheet.create({
-    overlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-    },
-    container: {
-        width: '100%',
-        maxWidth: 400,
-    },
-    cardWrapper: {
-        overflow: 'hidden',
-        borderRadius: 32,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.15)',
-        backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    },
-    blurContent: {
-        padding: 24,
-    },
-    content: {
-        alignItems: 'center',
-    },
-    iconContainer: {
-        padding: 16,
-        borderRadius: 99,
-        marginBottom: 16,
-    },
-    titleText: {
-        color: 'white',
-        fontSize: 20,
-        fontFamily: 'PlusJakartaSans_700Bold',
-        textAlign: 'center',
-    },
-    messageText: {
-        color: '#94a3b8',
-        fontSize: 15,
-        fontFamily: 'PlusJakartaSans_400Regular',
-        textAlign: 'center',
-        marginTop: 12,
-        lineHeight: 22,
-    },
-    buttonRow: {
-        flexDirection: 'row',
-        marginTop: 32,
-        width: '100%',
-        gap: 12,
-    },
-    cancelButton: {
-        flex: 1,
-        height: 56,
-        borderRadius: 16,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.1)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    cancelButtonText: {
-        color: '#94a3b8',
-        fontSize: 16,
-        fontFamily: 'PlusJakartaSans_600SemiBold',
-    },
-    confirmButton: {
-        flex: 1,
-        height: 56,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-            },
-            android: {
-                elevation: 4,
-            },
-        }),
-    },
-    confirmButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontFamily: 'PlusJakartaSans_700Bold',
-    },
-});
