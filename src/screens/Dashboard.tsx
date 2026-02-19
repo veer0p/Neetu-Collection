@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
@@ -8,10 +8,11 @@ import { useTransactions } from '../hooks/useTransactions';
 import { supabaseService } from '../store/supabaseService';
 import { AlertTriangle, ChevronRight, TrendingUp, TrendingDown } from 'lucide-react-native';
 import { cn } from '../utils/cn';
+import { useTheme } from '../context/ThemeContext';
 
-export default function Dashboard({ onLogout, user }: { onLogout: () => void; user: any; navigation?: any }) {
-    const navigation = useNavigation();
+export default function Dashboard({ onLogout, user, navigation }: { onLogout: () => void; user: any; navigation: any }) {
     const { userId } = useTransactions();
+    const { isDark } = useTheme();
     const [stats, setStats] = useState({
         netPosition: 0,
         receivable: 0,
@@ -87,13 +88,10 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                 .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
                 .slice(0, 5)
                 .map((t: any) => ({
-                    id: t.id,
-                    product: t.product_name,
-                    customer: t.customer_name,
-                    amount: t.selling_price,
-                    payment: t.customer_payment_status,
-                    status: t.status,
-                    date: t.date,
+                    ...t,
+                    product: t.productName,
+                    customer: t.customerName,
+                    amount: t.sellingPrice,
                 }));
 
             setStats({
@@ -131,7 +129,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
             <SafeAreaView className="flex-1" edges={['top']}>
                 <ScrollView
                     showsVerticalScrollIndicator={false}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4F46E5" />}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? '#818CF8' : '#4F46E5'} />}
                     contentContainerStyle={{ paddingBottom: 100 }}
                 >
                     {/* Header */}
@@ -141,7 +139,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
 
                     {loading && !refreshing ? (
                         <View className="py-20 items-center">
-                            <ActivityIndicator color="#4F46E5" size="large" />
+                            <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" />
                         </View>
                     ) : (
                         <View className="px-6">
@@ -162,8 +160,8 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                                 <View className="flex-row items-center mt-3 pt-3 border-t border-divider dark:border-divider-dark">
                                     {weekChange !== 0 && (
                                         weekChange > 0
-                                            ? <TrendingUp size={14} color="#10B981" />
-                                            : <TrendingDown size={14} color="#EF4444" />
+                                            ? <TrendingUp size={14} color={isDark ? '#34D399' : '#10B981'} />
+                                            : <TrendingDown size={14} color={isDark ? '#F87171' : '#EF4444'} />
                                     )}
                                     <Text className="text-secondary dark:text-secondary-dark font-sans text-xs ml-1">
                                         ₹{stats.thisWeekProfit.toLocaleString()} profit this week
@@ -176,7 +174,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                             <View className="flex-row gap-3 mb-4">
                                 <TouchableOpacity
                                     className="flex-1"
-                                    onPress={() => (navigation as any).navigate('Ledger')}
+                                    onPress={() => navigation.navigate('Ledger')}
                                 >
                                     <Card className="p-4">
                                         <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mb-1">To Collect</Text>
@@ -186,7 +184,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     className="flex-1"
-                                    onPress={() => (navigation as any).navigate('Ledger')}
+                                    onPress={() => navigation.navigate('Ledger')}
                                 >
                                     <Card className="p-4">
                                         <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mb-1">To Pay</Text>
@@ -200,7 +198,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                             {stats.alerts.length > 0 && (
                                 <View className="mb-4">
                                     <View className="flex-row items-center mb-2">
-                                        <AlertTriangle size={16} color="#F59E0B" />
+                                        <AlertTriangle size={16} color={isDark ? '#FBBF24' : '#F59E0B'} />
                                         <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm ml-2">Needs Attention</Text>
                                     </View>
                                     <Card className="p-4">
@@ -219,7 +217,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                                 <View className="mb-4">
                                     <View className="flex-row items-center justify-between mb-2">
                                         <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">Recent Orders</Text>
-                                        <TouchableOpacity onPress={() => (navigation as any).navigate('Orders')}>
+                                        <TouchableOpacity onPress={() => navigation.navigate('Orders')}>
                                             <Text className="text-accent font-sans-semibold text-xs">See all</Text>
                                         </TouchableOpacity>
                                     </View>
@@ -227,7 +225,7 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                                         {stats.recentOrders.map((order, i) => (
                                             <TouchableOpacity
                                                 key={order.id}
-                                                onPress={() => (navigation as any).navigate('OrderDetail', { orderId: order.id })}
+                                                onPress={() => navigation.navigate('OrderDetail', { order: order })}
                                                 className={cn("flex-row items-center py-3", i > 0 && "border-t border-divider dark:border-divider-dark")}
                                             >
                                                 <View className="flex-1">
@@ -242,10 +240,10 @@ export default function Dashboard({ onLogout, user }: { onLogout: () => void; us
                                                 <View className="items-end">
                                                     <Text className={cn(
                                                         "font-sans-semibold text-xs px-2 py-1 rounded-full",
-                                                        order.status === 'Delivered' ? "bg-success/10 text-success" :
-                                                            order.status === 'Shipped' ? "bg-accent/10 text-accent" :
-                                                                order.status === 'Booked' ? "bg-warning/10 text-warning" :
-                                                                    "bg-surface text-secondary"
+                                                        order.status === 'Delivered' ? "bg-success/10 text-success dark:text-success-dark" :
+                                                            order.status === 'Shipped' ? "bg-accent/10 text-accent dark:text-accent-dark" :
+                                                                order.status === 'Booked' ? "bg-warning/10 text-warning dark:text-warning-dark" :
+                                                                    "bg-secondary/10 text-secondary dark:text-secondary-dark"
                                                     )}>{order.status}</Text>
                                                 </View>
                                             </TouchableOpacity>

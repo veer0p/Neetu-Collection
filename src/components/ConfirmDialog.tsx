@@ -33,8 +33,8 @@ export const ConfirmDialog = ({
         switch (type) {
             case 'danger': return <AlertTriangle color="#EF4444" size={32} />;
             case 'warning': return <AlertTriangle color="#F59E0B" size={32} />;
-            case 'success': return <CheckCircle2 color="#10B981" size={32} />;
-            default: return <HelpCircle color="#4F46E5" size={32} />;
+            case 'success': return <CheckCircle2 color={isDark ? '#34D399' : '#10B981'} size={32} />;
+            default: return <HelpCircle color={isDark ? '#818CF8' : '#4F46E5'} size={32} />;
         }
     };
 

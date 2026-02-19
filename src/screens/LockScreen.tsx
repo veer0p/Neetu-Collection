@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Background } from '../components/Background';
 import { Fingerprint, Lock, ShieldCheck } from 'lucide-react-native';
 import { useBiometrics } from '../hooks/useBiometrics';
+import { useTheme } from '../context/ThemeContext';
 import { MotiView } from 'moti';
 
 interface LockScreenProps {
@@ -11,6 +12,7 @@ interface LockScreenProps {
 
 export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
     const { authenticate } = useBiometrics();
+    const { isDark } = useTheme();
     const [error, setError] = useState(false);
 
     useEffect(() => {
@@ -33,7 +35,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ onUnlock }) => {
                     className="items-center"
                 >
                     <View className="w-24 h-24 bg-accent/10 rounded-full items-center justify-center mb-8">
-                        <Lock color="#4F46E5" size={40} />
+                        <Lock color={isDark ? '#818CF8' : '#4F46E5'} size={40} />
                     </View>
 
                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-3xl text-center mb-2">App Locked</Text>

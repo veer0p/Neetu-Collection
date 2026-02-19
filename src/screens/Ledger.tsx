@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
@@ -8,12 +8,13 @@ import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
 import { Search, ChevronRight } from 'lucide-react-native';
 import { cn } from '../utils/cn';
+import { useTheme } from '../context/ThemeContext';
 
 type FilterTab = 'all' | 'customers' | 'vendors' | 'pickup';
 
-export default function Ledger() {
-    const navigation = useNavigation();
+export default function Ledger({ navigation }: { navigation: any }) {
     const { userId } = useTransactions();
+    const { isDark } = useTheme();
     const [accounts, setAccounts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -141,7 +142,7 @@ export default function Ledger() {
 
                 {loading ? (
                     <View className="flex-1 justify-center items-center">
-                        <ActivityIndicator color="#4F46E5" size="large" />
+                        <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" />
                     </View>
                 ) : (
                     <FlatList

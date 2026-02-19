@@ -88,6 +88,53 @@ export const supabaseService = {
         })) as Order[];
     },
 
+    async getOrderById(orderId: string): Promise<Order | null> {
+        const { data, error } = await supabase
+            .from('orders')
+            .select(`
+                *,
+                customer:directory!customer_id(name),
+                product:directory!product_id(name),
+                vendor:directory!vendor_id(name),
+                pickup_person:directory!pickup_person_id(name)
+            `)
+            .eq('id', orderId)
+            .single();
+
+        if (error) {
+            console.error('Error fetching order:', error);
+            return null;
+        }
+
+        return {
+            id: data.id,
+            userId: data.user_id,
+            date: data.date,
+            productId: data.product_id,
+            productName: data.product?.name || 'Unknown',
+            customerId: data.customer_id,
+            customerName: data.customer?.name || 'Unknown',
+            vendorId: data.vendor_id,
+            vendorName: data.vendor?.name || 'Unknown',
+            originalPrice: Number(data.original_price),
+            sellingPrice: Number(data.selling_price),
+            margin: Number(data.margin),
+            paidByDriver: data.paid_by_driver,
+            pickupPersonId: data.pickup_person_id,
+            pickupPersonName: data.pickup_person?.name,
+            trackingId: data.tracking_id,
+            courierName: data.courier_name,
+            pickupCharges: Number(data.pickup_charges),
+            shippingCharges: Number(data.shipping_charges),
+            status: data.status,
+            vendorPaymentStatus: data.vendor_payment_status,
+            customerPaymentStatus: data.customer_payment_status,
+            pickupPaymentStatus: data.pickup_payment_status,
+            notes: data.notes,
+            createdAt: new Date(data.created_at).getTime(),
+        } as Order;
+    },
+
     async saveOrder(order: Partial<Order>, userId: string): Promise<void> {
         const isUpdate = !!order.id;
         const margin = (order.sellingPrice || 0) - (order.originalPrice || 0) - (order.pickupCharges || 0) - (order.shippingCharges || 0);

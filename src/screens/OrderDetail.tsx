@@ -9,6 +9,7 @@ import { LedgerEntry } from '../utils/types';
 import { ChevronLeft, Trash2, Edit3, ArrowUpRight, ArrowDownLeft } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useTheme } from '../context/ThemeContext';
 
 const InfoRow = ({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) => (
     <View className="flex-row items-center justify-between py-3 border-b border-divider dark:border-divider-dark">
@@ -26,20 +27,36 @@ const StatusDot = ({ label, status }: { label: string; status: string }) => (
 );
 
 export default function OrderDetail({ route, navigation }: any) {
-    const order = route.params?.order;
+    const [order, setOrder] = useState<any>(route.params?.order);
+    const orderId = route.params?.orderId || order?.id;
     const { deleteOrder } = useTransactions();
+    const { isDark } = useTheme();
     const [ledgerEntries, setLedgerEntries] = useState<(LedgerEntry & { personName?: string })[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleteVisible, setDeleteVisible] = useState(false);
     const [deleting, setDeleting] = useState(false);
 
-    useEffect(() => { if (order?.id) loadLedger(); }, [order?.id]);
-
-    const loadLedger = async () => {
+    useEffect(() => {
+        if (orderId) {
+            loadData();
+        } else {
+            setLoading(false);
+        }
+    }, [orderId]);
+    const loadData = async () => {
         setLoading(true);
-        const entries = await supabaseService.getLedgerEntriesByOrder(order.id);
-        setLedgerEntries(entries);
-        setLoading(false);
+        try {
+            if (!order && orderId) {
+                const fetchedOrder = await supabaseService.getOrderById(orderId);
+                if (fetchedOrder) setOrder(fetchedOrder);
+            }
+            const entries = await supabaseService.getLedgerEntriesByOrder(orderId);
+            setLedgerEntries(entries);
+        } catch (error) {
+            console.error('Error loading order details:', error);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleDelete = async () => {
@@ -62,10 +79,10 @@ export default function OrderDetail({ route, navigation }: any) {
 
     const getStatusStyle = (s: string) => {
         switch (s) {
-            case 'Delivered': return 'bg-success/10 text-success';
-            case 'Shipped': return 'bg-accent/10 text-accent';
-            case 'Booked': return 'bg-warning/10 text-warning';
-            case 'Canceled': return 'bg-danger/10 text-danger';
+            case 'Delivered': return 'bg-success/10 text-success dark:text-success-dark';
+            case 'Shipped': return 'bg-accent/10 text-accent dark:text-accent-dark';
+            case 'Booked': return 'bg-warning/10 text-warning dark:text-warning-dark';
+            case 'Canceled': return 'bg-danger/10 text-danger dark:text-danger-dark';
             default: return 'bg-surface dark:bg-surface-dark text-secondary dark:text-secondary-dark';
         }
     };
@@ -77,7 +94,7 @@ export default function OrderDetail({ route, navigation }: any) {
                     {/* Header */}
                     <View className="flex-row items-center px-6 pt-4 pb-2">
                         <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
-                            <ChevronLeft color="#4F46E5" size={20} />
+                            <ChevronLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
                         </TouchableOpacity>
                         <View className="flex-1">
                             <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{order.productName}</Text>
@@ -92,7 +109,7 @@ export default function OrderDetail({ route, navigation }: any) {
                             onPress={() => navigation.navigate('AddEntry' as never, { orderId: order.id, orderData: order } as never)}
                             className="p-2 bg-accent/10 rounded-xl mr-2"
                         >
-                            <Edit3 color="#4F46E5" size={18} />
+                            <Edit3 color={isDark ? '#818CF8' : '#4F46E5'} size={18} />
                         </TouchableOpacity>
                         <TouchableOpacity
                             onPress={() => setDeleteVisible(true)}
@@ -140,7 +157,7 @@ export default function OrderDetail({ route, navigation }: any) {
                         <View className="mt-2">
                             <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">Ledger History</Text>
                             {loading ? (
-                                <ActivityIndicator color="#4F46E5" />
+                                <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} />
                             ) : (
                                 ledgerEntries.map((entry, idx) => (
                                     <View key={entry.id} className={cn("flex-row items-center py-4 bg-surface dark:bg-surface-dark px-4 rounded-2xl mb-2 border border-divider dark:border-divider-dark")}>

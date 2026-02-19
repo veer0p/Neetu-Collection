@@ -60,7 +60,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                                 width: 52,
                                 height: 52,
                                 borderRadius: 16,
-                                backgroundColor: '#4F46E5',
+                                backgroundColor: isDark ? '#818CF8' : '#4F46E5',
                                 justifyContent: 'center',
                                 alignItems: 'center',
                                 marginTop: -20,
@@ -76,7 +76,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
                     );
                 }
 
-                const color = isFocused ? '#6366F1' : (isDark ? '#94A3B8' : '#9CA3AF');
+                const color = isFocused ? (isDark ? '#818CF8' : '#6366F1') : (isDark ? '#94A3B8' : '#9CA3AF');
 
                 return (
                     <TouchableOpacity

@@ -10,11 +10,13 @@ import { Search, UserPlus, Phone, MapPin, ChevronRight, X, User, Truck, Package,
 import { useTransactions } from '../hooks/useTransactions';
 import { cn } from '../utils/cn';
 import { DirectoryItem } from '../utils/types';
+import { useTheme } from '../context/ThemeContext';
 
 type DirectoryType = 'Customer' | 'Vendor' | 'Product' | 'Pickup Person';
 
 export default function Directory() {
     const { userId } = useTransactions();
+    const { isDark } = useTheme();
     const [activeTab, setActiveTab] = useState<DirectoryType>('Customer');
     const [items, setItems] = useState<DirectoryItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -142,10 +144,10 @@ export default function Directory() {
 
                 <ScrollView
                     className="flex-1 px-6"
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4F46E5" />}
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? '#818CF8' : '#4F46E5'} />}
                 >
                     {loading && !refreshing ? (
-                        <View className="py-20 "><ActivityIndicator color="#4F46E5" /></View>
+                        <View className="py-20 "><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} /></View>
                     ) : (
                         <View className="pb-10">
                             {filteredItems.map((item, i) => (
@@ -155,7 +157,7 @@ export default function Directory() {
                                     className={cn("flex-row items-center py-4", i > 0 && "border-t border-divider dark:border-divider-dark")}
                                 >
                                     <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
-                                        <User size={20} color="#4F46E5" />
+                                        <User size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
                                     </View>
                                     <View className="flex-1">
                                         <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.name}</Text>

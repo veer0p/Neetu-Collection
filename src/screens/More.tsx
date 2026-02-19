@@ -3,26 +3,24 @@ import { View, Text, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
-import { useNavigation } from '@react-navigation/native';
 import { useBiometrics } from '../hooks/useBiometrics';
 import { useTheme } from '../context/ThemeContext';
 import { BarChart3, Contact2, Fingerprint, LogOut, ChevronRight, Info, Moon, Sun } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 
-export default function More({ user, onLogout }: { user?: any; onLogout?: () => void }) {
-    const navigation = useNavigation();
+export default function More({ user, onLogout, navigation }: { user?: any; onLogout?: () => void; navigation: any }) {
     const { isEnabled, toggleBiometrics } = useBiometrics();
     const { theme, toggleTheme, isDark } = useTheme();
 
     const menuItems = [
         {
-            icon: <BarChart3 size={20} color="#4F46E5" />,
+            icon: <BarChart3 size={20} color={isDark ? '#818CF8' : '#4F46E5'} />,
             label: 'Business Insights',
             subtitle: 'Analytics & trends',
             onPress: () => (navigation as any).navigate('Insights'),
         },
         {
-            icon: <Contact2 size={20} color="#4F46E5" />,
+            icon: <Contact2 size={20} color={isDark ? '#818CF8' : '#4F46E5'} />,
             label: 'Directory',
             subtitle: 'Customers, vendors, products',
             onPress: () => (navigation as any).navigate('Directory'),
@@ -64,28 +62,28 @@ export default function More({ user, onLogout }: { user?: any; onLogout?: () => 
                         <View className="flex-row items-center justify-between py-4 border-b border-divider dark:border-divider-dark">
                             <View className="flex-row items-center">
                                 <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
-                                    {isDark ? <Moon size={20} color="#4F46E5" /> : <Sun size={20} color="#4F46E5" />}
+                                    {isDark ? <Moon size={20} color="#818CF8" /> : <Sun size={20} color="#4F46E5" />}
                                 </View>
                                 <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">Dark Mode</Text>
                             </View>
                             <Switch
                                 value={isDark}
                                 onValueChange={() => { toggleTheme(); }}
-                                trackColor={{ false: '#E5E7EB', true: '#4F46E5' }}
+                                trackColor={{ false: '#E5E7EB', true: isDark ? '#818CF8' : '#4F46E5' }}
                                 thumbColor="#FFFFFF"
                             />
                         </View>
                         <View className="flex-row items-center justify-between py-4 border-b border-divider dark:border-divider-dark">
                             <View className="flex-row items-center">
                                 <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
-                                    <Fingerprint size={20} color="#4F46E5" />
+                                    <Fingerprint size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
                                 </View>
                                 <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">Biometric Lock</Text>
                             </View>
                             <Switch
                                 value={isEnabled}
                                 onValueChange={(val) => { toggleBiometrics(val); }}
-                                trackColor={{ false: '#E5E7EB', true: '#4F46E5' }}
+                                trackColor={{ false: '#E5E7EB', true: isDark ? '#818CF8' : '#4F46E5' }}
                                 thumbColor="#FFFFFF"
                             />
                         </View>

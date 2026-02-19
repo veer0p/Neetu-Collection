@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { cn } from '../utils/cn';
 import { Background } from '../components/Background';
@@ -8,6 +8,7 @@ import { Card } from '../components/Card';
 import { useTransactions } from '../hooks/useTransactions';
 import { Search, ChevronRight } from 'lucide-react-native';
 import { BottomSheetPicker, PickerOption } from '../components/BottomSheetPicker';
+import { useTheme } from '../context/ThemeContext';
 
 type StatusFilter = 'All' | 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
 
@@ -32,9 +33,9 @@ const getDateLabel = (dateStr: string): string => {
     return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-export default function Transactions() {
+export default function Transactions({ navigation }: { navigation: any }) {
     const { orders, loading, refresh, updateOrderStatus } = useTransactions();
-    const navigation = useNavigation<any>();
+    const { isDark } = useTheme();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
     const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -44,10 +45,10 @@ export default function Transactions() {
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
     const statusOptions: PickerOption[] = [
-        { label: 'Booked', value: 'Booked', color: '#4F46E5' },
-        { label: 'Shipped', value: 'Shipped', color: '#4F46E5' },
-        { label: 'Delivered', value: 'Delivered', color: '#10B981' },
-        { label: 'Canceled', value: 'Canceled', color: '#EF4444' },
+        { label: 'Booked', value: 'Booked', color: isDark ? '#818CF8' : '#4F46E5' },
+        { label: 'Shipped', value: 'Shipped', color: isDark ? '#818CF8' : '#4F46E5' },
+        { label: 'Delivered', value: 'Delivered', color: isDark ? '#34D399' : '#10B981' },
+        { label: 'Canceled', value: 'Canceled', color: isDark ? '#F87171' : '#EF4444' },
     ];
 
     const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -88,11 +89,11 @@ export default function Transactions() {
 
     const getStatusStyle = (status: string) => {
         switch (status) {
-            case 'Delivered': return { bg: 'bg-success/10', text: 'text-success' };
-            case 'Shipped': return { bg: 'bg-accent/10', text: 'text-accent' };
-            case 'Booked': return { bg: 'bg-warning/10', text: 'text-warning' };
-            case 'Canceled': return { bg: 'bg-danger/10', text: 'text-danger' };
-            default: return { bg: 'bg-surface', text: 'text-secondary' };
+            case 'Delivered': return { bg: 'bg-success/10', text: 'text-success dark:text-success-dark' };
+            case 'Shipped': return { bg: 'bg-accent/10', text: 'text-accent dark:text-accent-dark' };
+            case 'Booked': return { bg: 'bg-warning/10', text: 'text-warning dark:text-warning-dark' };
+            case 'Canceled': return { bg: 'bg-danger/10', text: 'text-danger dark:text-danger-dark' };
+            default: return { bg: 'bg-surface dark:bg-surface-dark', text: 'text-secondary dark:text-secondary-dark' };
         }
     };
 
@@ -176,7 +177,7 @@ export default function Transactions() {
                                                     className={cn("mt-1 px-2 py-0.5 rounded-full", getStatusStyle(item.status).bg)}
                                                 >
                                                     {updatingId === item.id ? (
-                                                        <ActivityIndicator size={10} color="#4F46E5" />
+                                                        <ActivityIndicator size={10} color={isDark ? '#818CF8' : '#4F46E5'} />
                                                     ) : (
                                                         <Text className={cn("font-sans-semibold text-[10px]", getStatusStyle(item.status).text)}>
                                                             {item.status || 'Pending'}

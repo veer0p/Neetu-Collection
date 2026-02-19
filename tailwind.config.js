@@ -21,14 +21,26 @@ module.exports = {
           DEFAULT: "#6B7280",
           dark: "#94A3B8", // slate-400
         },
-        accent: "#4F46E5",
+        accent: {
+          DEFAULT: "#4F46E5",
+          dark: "#818CF8", // indigo-400
+        },
         divider: {
           DEFAULT: "#F0F0F5",
           dark: "#334155", // slate-700
         },
-        success: "#10B981",
-        warning: "#F59E0B",
-        danger: "#EF4444",
+        success: {
+          DEFAULT: "#10B981",
+          dark: "#34D399", // emerald-400
+        },
+        warning: {
+          DEFAULT: "#F59E0B",
+          dark: "#FBBF24", // amber-400
+        },
+        danger: {
+          DEFAULT: "#EF4444",
+          dark: "#F87171", // red-400
+        },
       },
       fontFamily: {
         sans: ["PlusJakartaSans_400Regular", "sans-serif"],

@@ -10,14 +10,15 @@ import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
 import { DirectoryItem, LedgerEntry } from '../utils/types';
 import { ArrowLeft, Plus, IndianRupee, FileText, TrendingUp, TrendingDown, X } from 'lucide-react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { cn } from '../utils/cn';
+import { useTheme } from '../context/ThemeContext';
 
-export default function AccountDetail() {
-    const navigation = useNavigation();
+export default function AccountDetail({ navigation }: { navigation: any }) {
     const route = useRoute();
     const { person } = route.params as { person: DirectoryItem };
     const { userId } = useTransactions();
+    const { isDark } = useTheme();
 
     const [ledger, setLedger] = useState<LedgerEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -79,7 +80,7 @@ export default function AccountDetail() {
                 {/* Header */}
                 <View className="px-6 pt-4 pb-2 flex-row items-center">
                     <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
-                        <ArrowLeft color="#4F46E5" size={20} />
+                        <ArrowLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
                     </TouchableOpacity>
                     <View className="flex-1">
                         <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{person.name}</Text>
@@ -136,7 +137,7 @@ export default function AccountDetail() {
 
                 {/* Ledger List */}
                 {loading ? (
-                    <View className="flex-1 justify-center items-center"><ActivityIndicator color="#4F46E5" size="large" /></View>
+                    <View className="flex-1 justify-center items-center"><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" /></View>
                 ) : (
                     <FlatList
                         data={ledger.filter(e => typeFilter === 'All' || e.transactionType === typeFilter)}
@@ -259,7 +260,7 @@ export default function AccountDetail() {
                                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{selectedEntry?.orderProductName}</Text>
                                 </View>
                                 <TouchableOpacity onPress={() => setOrderModalVisible(false)} className="p-2 bg-surface dark:bg-surface-dark rounded-full">
-                                    <X size={18} color="#9CA3AF" />
+                                    <X size={18} color={isDark ? '#94A3B8' : '#9CA3AF'} />
                                 </TouchableOpacity>
                             </View>
                             <View className="gap-2 mb-6">

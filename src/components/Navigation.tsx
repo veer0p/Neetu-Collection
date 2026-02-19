@@ -46,12 +46,9 @@ export const AppNavigation = () => {
         const init = async () => {
             await checkSession();
             await checkStatus();
-            setLoading(false);
         };
         init();
     }, []);
-
-    const isLocked = user && isEnabled && !hasUnlocked;
 
     const checkSession = async () => {
         try {
@@ -67,25 +64,36 @@ export const AppNavigation = () => {
     const handleLogout = async () => {
         await supabaseService.signOut();
         setUser(null);
+        setHasUnlocked(false);
     };
+
+    const isLocked = user && isEnabled && !hasUnlocked;
 
     if (loading || biometricsLoading) {
         return (
             <View style={{ flex: 1, backgroundColor: isDark ? '#0F172A' : '#FFFFFF', justifyContent: 'center', alignItems: 'center' }}>
-                <ActivityIndicator size="large" color="#4F46E5" />
+                <ActivityIndicator size="large" color={isDark ? '#818CF8' : '#4F46E5'} />
             </View>
         );
     }
 
     return (
         <NavigationContainer theme={isDark ? DarkTheme : LightTheme}>
-            {!user ? (
-                <Login onLoginSuccess={(userData) => setUser(userData)} />
-            ) : isLocked ? (
-                <LockScreen onUnlock={() => setHasUnlocked(true)} />
-            ) : (
-                <MainTabs user={user} onLogout={handleLogout} />
-            )}
+            <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+                {!user ? (
+                    <Stack.Screen name="Login">
+                        {(props) => <Login {...props} onLoginSuccess={(userData) => setUser(userData)} />}
+                    </Stack.Screen>
+                ) : isLocked ? (
+                    <Stack.Screen name="Lock">
+                        {(props) => <LockScreen {...props} onUnlock={() => setHasUnlocked(true)} />}
+                    </Stack.Screen>
+                ) : (
+                    <Stack.Screen name="Main">
+                        {(props) => <MainTabs {...props} user={user} onLogout={handleLogout} />}
+                    </Stack.Screen>
+                )}
+            </Stack.Navigator>
         </NavigationContainer>
     );
 };

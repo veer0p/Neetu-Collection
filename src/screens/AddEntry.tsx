@@ -11,16 +11,16 @@ import {
     ChevronLeft, Package, User, ShoppingBag, Truck, IndianRupee,
     FileText, Check, MapPin
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
 import { cn } from '../utils/cn';
 import { OrderStatus, Order } from '../utils/types';
+import { useTheme } from '../context/ThemeContext';
 
 const STATUS_OPTIONS: OrderStatus[] = ['Booked', 'Shipped', 'Delivered', 'Canceled'];
 
-export default function AddEntry({ route }: any) {
-    const navigation = useNavigation();
+export default function AddEntry({ route, navigation }: any) {
     const editingOrder = route.params?.orderData as Order | undefined;
     const { userId, refresh } = useTransactions();
+    const { isDark } = useTheme();
 
     const [form, setForm] = useState({
         productName: editingOrder?.productName || '',
@@ -133,7 +133,7 @@ export default function AddEntry({ route }: any) {
     const Section = ({ title, icon: Icon, children }: any) => (
         <View className="mb-6">
             <View className="flex-row items-center mb-3 px-1">
-                <Icon size={16} color="#4F46E5" />
+                <Icon size={16} color={isDark ? '#818CF8' : '#4F46E5'} />
                 <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm ml-2 uppercase tracking-wider">{title}</Text>
             </View>
             <Card className="p-4">{children}</Card>
@@ -165,7 +165,7 @@ export default function AddEntry({ route }: any) {
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View className="px-6 pt-4 pb-2 flex-row items-center justify-between">
                     <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl">
-                        <ChevronLeft color="#4F46E5" size={20} />
+                        <ChevronLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
                     </TouchableOpacity>
                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{editingOrder ? 'Edit Order' : 'New Order'}</Text>
                     <View className="w-10" />
@@ -278,7 +278,7 @@ export default function AddEntry({ route }: any) {
                                 onToggle={v => setForm(prev => ({ ...prev, vendorPaymentStatus: v }))}
                             />
                             {form.pickupPersonName && (
-                                <View className="mt-2 pt-2 border-t border-divider">
+                                <View className={cn("mt-2 pt-2 border-t", isDark ? "border-divider-dark" : "border-divider")}>
                                     <ToggleRow
                                         label="Pickup Payment"
                                         value={form.pickupPaymentStatus}
@@ -327,7 +327,7 @@ export default function AddEntry({ route }: any) {
                 {/* Suggestions Overlay */}
                 {suggestions.data.length > 0 && (
                     <View
-                        className="absolute bg-white border border-divider rounded-2xl shadow-xl z-50 p-2"
+                        className="absolute bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl shadow-xl z-50 p-2"
                         style={{ top: 150, left: 24, right: 24, maxHeight: 200 }}
                     >
                         <ScrollView>
@@ -335,9 +335,9 @@ export default function AddEntry({ route }: any) {
                                 <TouchableOpacity
                                     key={idx}
                                     onPress={() => selectSuggestion(item)}
-                                    className="p-3 border-b border-divider last:border-0"
+                                    className="p-3 border-b border-divider dark:border-divider-dark last:border-0"
                                 >
-                                    <Text className="text-primary font-sans-medium">{item.name}</Text>
+                                    <Text className="text-primary dark:text-primary-dark font-sans-medium">{item.name}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>

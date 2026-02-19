@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
@@ -8,12 +7,13 @@ import { useTransactions } from '../hooks/useTransactions';
 import { supabaseService } from '../store/supabaseService';
 import { BarChart3, Users, Store, ChevronLeft, TrendingUp, ShoppingBag } from 'lucide-react-native';
 import { cn } from '../utils/cn';
+import { useTheme } from '../context/ThemeContext';
 
 type Tab = 'products' | 'customers' | 'vendors' | 'trends';
 
-export default function Reports() {
-    const navigation = useNavigation();
+export default function Reports({ navigation }: { navigation: any }) {
     const { orders: transactions, loading: transLoading, refresh, userId } = useTransactions();
+    const { isDark } = useTheme();
     const [activeTab, setActiveTab] = useState<Tab>('products');
     const [loading, setLoading] = useState(true);
     const [productAnalysis, setProductAnalysis] = useState<any[]>([]);
@@ -102,7 +102,7 @@ export default function Reports() {
         <View className="px-6 pt-4 pb-2">
             <View className="flex-row items-center mb-4">
                 <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
-                    <ChevronLeft color="#4F46E5" size={20} />
+                    <ChevronLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
                 </TouchableOpacity>
                 <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl">Insights</Text>
             </View>
@@ -201,7 +201,7 @@ export default function Reports() {
                 <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
                     {loading ? (
                         <View className="py-20 items-center">
-                            <ActivityIndicator color="#4F46E5" size="large" />
+                            <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" />
                         </View>
                     ) : (
                         <>
