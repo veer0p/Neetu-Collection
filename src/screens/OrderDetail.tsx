@@ -153,6 +153,52 @@ export default function OrderDetail({ route, navigation }: any) {
                             {order.shippingCharges > 0 && <InfoRow label="Shipping" value={`₹${Number(order.shippingCharges).toLocaleString()}`} valueColor="text-danger" />}
                         </Card>
 
+                        {/* Status Timeline */}
+                        <View className="mt-6 mb-2">
+                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-4 ml-1">Status Timeline</Text>
+                            <Card className="p-5">
+                                {order.statusHistory && order.statusHistory.length > 0 ? (
+                                    order.statusHistory.map((history: any, idx: number) => (
+                                        <View key={idx} className="flex-row">
+                                            <View className="items-center mr-4">
+                                                <View className={cn(
+                                                    "w-3 h-3 rounded-full z-10",
+                                                    idx === order.statusHistory.length - 1 ? "bg-accent" : "bg-divider dark:bg-divider-dark"
+                                                )} />
+                                                {idx < order.statusHistory.length - 1 && (
+                                                    <View className="w-0.5 flex-1 bg-divider dark:bg-divider-dark my-1" />
+                                                )}
+                                            </View>
+                                            <View className="flex-1 pb-6">
+                                                <View className="flex-row justify-between items-center mb-1">
+                                                    <Text className={cn(
+                                                        "font-sans-bold text-sm",
+                                                        idx === order.statusHistory.length - 1 ? "text-primary dark:text-primary-dark" : "text-secondary dark:text-secondary-dark"
+                                                    )}>
+                                                        {history.status}
+                                                    </Text>
+                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">
+                                                        {new Date(history.date).toLocaleDateString('en-GB')} {new Date(history.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                                    </Text>
+                                                </View>
+                                                {idx === order.statusHistory.length - 1 && (
+                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Current Status</Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                    ))
+                                ) : (
+                                    <View className="flex-row items-center py-2">
+                                        <View className="w-3 h-3 rounded-full bg-accent mr-4" />
+                                        <View className="flex-1">
+                                            <Text className="font-sans-bold text-sm text-primary dark:text-primary-dark">{order.status}</Text>
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Initial recorded status</Text>
+                                        </View>
+                                    </View>
+                                )}
+                            </Card>
+                        </View>
+
                         {/* Ledger History */}
                         <View className="mt-2">
                             <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">Ledger History</Text>

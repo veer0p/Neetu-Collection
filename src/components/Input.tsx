@@ -24,7 +24,8 @@ export const Input = React.forwardRef<TextInput, InputProps>(({
             {label && <Text className="text-secondary dark:text-secondary-dark font-sans-medium text-sm mb-1.5 ml-1">{label}</Text>}
             <View
                 className={cn(
-                    "flex-row items-center bg-white dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12",
+                    "flex-row items-center bg-white dark:bg-surface-dark border border-black/[0.08] dark:border-white/10 px-4", // Added px-4 for consistent spacing
+                    props.multiline ? "min-h-[48px] py-2" : "h-12",
                     error && "border-red-500",
                 )}
             >
@@ -32,7 +33,7 @@ export const Input = React.forwardRef<TextInput, InputProps>(({
                 <TextInput
                     ref={ref}
                     placeholderTextColor={isDark ? "#64748b" : "#94a3b8"} // slate-500 : slate-400
-                    className="flex-1 text-primary dark:text-primary-dark font-sans text-base"
+                    className="flex-1 text-primary dark:text-primary-dark font-sans text-base p-0" // Removed default padding to use container padding
                     {...props}
                 />
             </View>

@@ -108,7 +108,12 @@ export default function Reports({ navigation }: { navigation: any }) {
             </View>
 
             {/* Tabs */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-6 px-6 mb-6">
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                className="-mx-6 mb-6"
+                contentContainerStyle={{ paddingHorizontal: 24 }}
+            >
                 <View className="flex-row gap-2">
                     {tabs.map(tab => (
                         <TouchableOpacity

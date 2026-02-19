@@ -31,6 +31,7 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
     const [orderModalVisible, setOrderModalVisible] = useState(false);
     const [editNotes, setEditNotes] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('All');
+    const [fullBalance, setFullBalance] = useState(0);
 
     useEffect(() => { loadLedger(); }, []);
     useFocusEffect(useCallback(() => { loadLedger(); }, []));
@@ -38,16 +39,28 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
     const loadLedger = async () => {
         setLoading(true);
         const data = await supabaseService.getLedgerEntries(person.id);
-        setLedger(data);
+
+        // Calculate the TRUE balance from unfiltered data
+        const total = data.reduce((acc, curr) => acc + curr.amount, 0);
+        setFullBalance(total);
+
+        // For Vendor accounts: hide entries that are internally settled by driver
+        // (PaymentOut entries with "Paid by driver" notes are intermediary bookkeeping)
+        // For Pickup Person accounts: show all entries (they need full visibility)
+        const filteredData = data.filter(entry => {
+            // Hide "Paid by driver" PaymentOut from vendor view — this was settled by pickup person, not shop owner directly
+            if (person.type === 'Vendor' && entry.transactionType === 'PaymentOut' && entry.notes === 'Paid by driver') {
+                return false;
+            }
+            return true;
+        });
+        setLedger(filteredData);
         setLoading(false);
     };
 
     const handleAddPayment = async () => {
         if (!userId || !paymentForm.amount) return;
         const amount = parseFloat(paymentForm.amount);
-        // Balance logic: PaymentIn reduces what they owe (if positive balance) 
-        // Or increases what we owe them (if negative balance)
-        // Wait, the ledger convention is: Sale = positive, Purchase = negative, PaymentIn = negative, PaymentOut = positive
         const finalAmount = paymentForm.type === 'PaymentIn' ? -amount : amount;
         await supabaseService.addPayment({
             personId: person.id, amount: finalAmount,
@@ -71,7 +84,6 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
         else { setEditNotes(item.notes || ''); setEditModalVisible(true); }
     };
 
-    const currentBalance = ledger.reduce((acc, curr) => acc + curr.amount, 0);
     const filterTypes = ['All', 'Sale', 'Purchase', 'PaymentIn', 'PaymentOut'];
 
     return (
@@ -104,36 +116,47 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                         <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-wider mb-1">Current Balance</Text>
                         <Text className={cn(
                             "text-4xl font-sans-bold",
-                            currentBalance > 0 ? "text-danger" : currentBalance < 0 ? "text-success" : "text-primary dark:text-primary-dark"
+                            fullBalance > 0 ? "text-danger" : fullBalance < 0 ? "text-success" : "text-primary dark:text-primary-dark"
                         )}>
-                            ₹{Math.abs(currentBalance).toLocaleString()}
+                            ₹{Math.abs(fullBalance).toLocaleString()}
                         </Text>
                         <Text className={cn("font-sans-semibold text-xs mt-1",
-                            currentBalance > 0 ? "text-danger" : currentBalance < 0 ? "text-success" : "text-secondary dark:text-secondary-dark"
+                            fullBalance > 0 ? "text-danger" : fullBalance < 0 ? "text-success" : "text-secondary dark:text-secondary-dark"
                         )}>
-                            {currentBalance > 0 ? "You are owed" : currentBalance < 0 ? "You owe" : "Settled"}
+                            {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled"}
                         </Text>
                     </Card>
                 </View>
 
-                {/* Tabs */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-6 mb-4" contentContainerStyle={{ gap: 8 }}>
-                    {filterTypes.map(t => (
-                        <TouchableOpacity
-                            key={t}
-                            onPress={() => setTypeFilter(t)}
-                            className={cn(
-                                "px-4 py-2 rounded-full",
-                                typeFilter === t ? "bg-accent" : "bg-surface dark:bg-surface-dark"
-                            )}
-                        >
-                            <Text className={cn(
-                                "font-sans-semibold text-xs",
-                                typeFilter === t ? "text-white" : "text-secondary dark:text-secondary-dark"
-                            )}>{t}</Text>
-                        </TouchableOpacity>
-                    ))}
-                </ScrollView>
+                {/* Tabs - Fixed: using inline style height to prevent blown up pills */}
+                <View style={{ paddingHorizontal: 24, marginBottom: 12 }}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ gap: 8 }}
+                    >
+                        {filterTypes.map(t => (
+                            <TouchableOpacity
+                                key={t}
+                                onPress={() => setTypeFilter(t)}
+                                style={{
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 8,
+                                    borderRadius: 999,
+                                    backgroundColor: typeFilter === t
+                                        ? (isDark ? '#818CF8' : '#4F46E5')
+                                        : (isDark ? '#1E293B' : '#F8F9FB'),
+                                }}
+                            >
+                                <Text style={{
+                                    fontSize: 12,
+                                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                                    color: typeFilter === t ? '#FFFFFF' : (isDark ? '#94A3B8' : '#6B7280'),
+                                }}>{t}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
 
                 {/* Ledger List */}
                 {loading ? (

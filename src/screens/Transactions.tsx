@@ -6,11 +6,16 @@ import { cn } from '../utils/cn';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
 import { useTransactions } from '../hooks/useTransactions';
-import { Search, ChevronRight } from 'lucide-react-native';
+import { Search, ChevronRight, ChevronDown } from 'lucide-react-native';
 import { BottomSheetPicker, PickerOption } from '../components/BottomSheetPicker';
 import { useTheme } from '../context/ThemeContext';
 
 type StatusFilter = 'All' | 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
+
+const STATUS_FLOW: Record<string, string> = {
+    'Booked': 'Shipped',
+    'Shipped': 'Delivered',
+};
 
 const parseDate = (dateStr: string): Date | null => {
     if (!dateStr) return null;
@@ -42,10 +47,12 @@ export default function Transactions({ navigation }: { navigation: any }) {
     const [pickerVisible, setPickerVisible] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
+    const [directOnly, setDirectOnly] = useState(false);
+
     useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
     const statusOptions: PickerOption[] = [
-        { label: 'Booked', value: 'Booked', color: isDark ? '#818CF8' : '#4F46E5' },
+        { label: 'Booked', value: 'Booked', color: isDark ? '#FBBF24' : '#F59E0B' },
         { label: 'Shipped', value: 'Shipped', color: isDark ? '#818CF8' : '#4F46E5' },
         { label: 'Delivered', value: 'Delivered', color: isDark ? '#34D399' : '#10B981' },
         { label: 'Canceled', value: 'Canceled', color: isDark ? '#F87171' : '#EF4444' },
@@ -58,6 +65,13 @@ export default function Transactions({ navigation }: { navigation: any }) {
         finally { setUpdatingId(null); }
     };
 
+    const handleQuickAdvance = async (item: any) => {
+        const nextStatus = STATUS_FLOW[item.status];
+        if (nextStatus) {
+            await handleStatusChange(item.id, nextStatus);
+        }
+    };
+
     const filtered = useMemo(() => orders.filter((item: any) => {
         const q = search.toLowerCase();
         const matchSearch = !q ||
@@ -66,8 +80,12 @@ export default function Transactions({ navigation }: { navigation: any }) {
             item.vendorName.toLowerCase().includes(q) ||
             (item.trackingId && item.trackingId.toLowerCase().includes(q));
         const matchStatus = statusFilter === 'All' || item.status === statusFilter;
-        return matchSearch && matchStatus;
-    }), [orders, search, statusFilter]);
+
+        // Direct Only filter: exclude if pickupPersonId exists
+        const matchDirect = !directOnly || !item.pickupPersonId;
+
+        return matchSearch && matchStatus && matchDirect;
+    }), [orders, search, statusFilter, directOnly]);
 
     // Group by date
     const grouped = useMemo(() => {
@@ -89,12 +107,18 @@ export default function Transactions({ navigation }: { navigation: any }) {
 
     const getStatusStyle = (status: string) => {
         switch (status) {
-            case 'Delivered': return { bg: 'bg-success/10', text: 'text-success dark:text-success-dark' };
-            case 'Shipped': return { bg: 'bg-accent/10', text: 'text-accent dark:text-accent-dark' };
-            case 'Booked': return { bg: 'bg-warning/10', text: 'text-warning dark:text-warning-dark' };
-            case 'Canceled': return { bg: 'bg-danger/10', text: 'text-danger dark:text-danger-dark' };
-            default: return { bg: 'bg-surface dark:bg-surface-dark', text: 'text-secondary dark:text-secondary-dark' };
+            case 'Delivered': return { bg: 'bg-success/10', text: 'text-success dark:text-success-dark', color: isDark ? '#34D399' : '#10B981' };
+            case 'Shipped': return { bg: 'bg-accent/10', text: 'text-accent dark:text-accent-dark', color: isDark ? '#818CF8' : '#4F46E5' };
+            case 'Booked': return { bg: 'bg-warning/10', text: 'text-warning dark:text-warning-dark', color: isDark ? '#FBBF24' : '#F59E0B' };
+            case 'Canceled': return { bg: 'bg-danger/10', text: 'text-danger dark:text-danger-dark', color: isDark ? '#F87171' : '#EF4444' };
+            default: return { bg: 'bg-surface dark:bg-surface-dark', text: 'text-secondary dark:text-secondary-dark', color: '#9CA3AF' };
         }
+    };
+
+    const getNextLabel = (status: string) => {
+        const next = STATUS_FLOW[status];
+        if (!next) return null;
+        return next === 'Shipped' ? '→ Ship' : '→ Deliver';
     };
 
     return (
@@ -103,16 +127,32 @@ export default function Transactions({ navigation }: { navigation: any }) {
                 <View className="px-6 pt-4 pb-2">
                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Orders</Text>
 
-                    {/* Search */}
-                    <View className="flex-row items-center bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12 mb-3">
-                        <Search size={18} color="#9CA3AF" />
-                        <TextInput
-                            placeholder="Search orders..."
-                            placeholderTextColor="#9CA3AF"
-                            className="flex-1 ml-3 text-primary dark:text-primary-dark font-sans text-sm"
-                            value={search}
-                            onChangeText={setSearch}
-                        />
+                    {/* Search and Filters */}
+                    <View className="flex-row items-center gap-3 mb-3">
+                        <View className="flex-1 flex-row items-center bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12">
+                            <Search size={18} color="#9CA3AF" />
+                            <TextInput
+                                placeholder="Search orders..."
+                                placeholderTextColor="#9CA3AF"
+                                className="flex-1 ml-3 text-primary dark:text-primary-dark font-sans text-sm"
+                                value={search}
+                                onChangeText={setSearch}
+                            />
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setDirectOnly(!directOnly)}
+                            className={cn(
+                                "px-4 h-12 rounded-2xl border items-center justify-center",
+                                directOnly
+                                    ? "bg-accent border-accent"
+                                    : "bg-surface dark:bg-surface-dark border-divider dark:border-divider-dark"
+                            )}
+                        >
+                            <Text className={cn(
+                                "font-sans-bold text-xs",
+                                directOnly ? "text-white" : "text-secondary dark:text-secondary-dark"
+                            )}>Direct</Text>
+                        </TouchableOpacity>
                     </View>
 
                     {/* Status chips */}
@@ -130,7 +170,7 @@ export default function Transactions({ navigation }: { navigation: any }) {
                                     "font-sans-semibold text-xs",
                                     statusFilter === s ? "text-white" : "text-secondary dark:text-secondary-dark"
                                 )}>
-                                    {s === 'All' ? `All (${orders.length})` : s}
+                                    {s === 'All' ? `All (${filtered.length})` : s}
                                 </Text>
                             </TouchableOpacity>
                         ))}
@@ -167,23 +207,46 @@ export default function Transactions({ navigation }: { navigation: any }) {
                                             </View>
                                             <View className="items-end ml-3">
                                                 <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">₹{Number(item.sellingPrice).toLocaleString()}</Text>
-                                                <TouchableOpacity
-                                                    onPress={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedOrder(item);
-                                                        setPickerVisible(true);
-                                                    }}
-                                                    disabled={updatingId === item.id}
-                                                    className={cn("mt-1 px-2 py-0.5 rounded-full", getStatusStyle(item.status).bg)}
-                                                >
-                                                    {updatingId === item.id ? (
-                                                        <ActivityIndicator size={10} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                                    ) : (
-                                                        <Text className={cn("font-sans-semibold text-[10px]", getStatusStyle(item.status).text)}>
-                                                            {item.status || 'Pending'}
-                                                        </Text>
+                                                <View className="flex-row items-center gap-2 mt-2">
+                                                    {/* Quick advance button - Made more prominent */}
+                                                    {STATUS_FLOW[item.status] && (
+                                                        <TouchableOpacity
+                                                            onPress={(e) => {
+                                                                e.stopPropagation();
+                                                                handleQuickAdvance(item);
+                                                            }}
+                                                            disabled={updatingId === item.id}
+                                                            className="px-3 py-1 rounded-lg bg-accent/20 border border-accent/30"
+                                                            activeOpacity={0.6}
+                                                        >
+                                                            <Text className="text-accent dark:text-accent-dark font-sans-bold text-[11px] uppercase tracking-tighter">
+                                                                {getNextLabel(item.status)}
+                                                            </Text>
+                                                        </TouchableOpacity>
                                                     )}
-                                                </TouchableOpacity>
+                                                    {/* Status badge with dropdown */}
+                                                    <TouchableOpacity
+                                                        onPress={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedOrder(item);
+                                                            setPickerVisible(true);
+                                                        }}
+                                                        disabled={updatingId === item.id}
+                                                        className={cn("flex-row items-center px-2 py-1 rounded-lg", getStatusStyle(item.status).bg)}
+                                                        activeOpacity={0.7}
+                                                    >
+                                                        {updatingId === item.id ? (
+                                                            <ActivityIndicator size={10} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                        ) : (
+                                                            <>
+                                                                <Text className={cn("font-sans-bold text-[10px] uppercase", getStatusStyle(item.status).text)}>
+                                                                    {item.status || 'Pending'}
+                                                                </Text>
+                                                                <ChevronDown size={10} color={getStatusStyle(item.status).color} style={{ marginLeft: 3 }} />
+                                                            </>
+                                                        )}
+                                                    </TouchableOpacity>
+                                                </View>
                                             </View>
                                         </View>
                                     </TouchableOpacity>

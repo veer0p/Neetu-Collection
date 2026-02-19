@@ -84,6 +84,7 @@ export const supabaseService = {
             customerPaymentStatus: item.customer_payment_status,
             pickupPaymentStatus: item.pickup_payment_status,
             notes: item.notes,
+            statusHistory: item.status_history,
             createdAt: new Date(item.created_at).getTime(),
         })) as Order[];
     },
@@ -131,6 +132,7 @@ export const supabaseService = {
             customerPaymentStatus: data.customer_payment_status,
             pickupPaymentStatus: data.pickup_payment_status,
             notes: data.notes,
+            statusHistory: data.status_history,
             createdAt: new Date(data.created_at).getTime(),
         } as Order;
     },
@@ -141,9 +143,9 @@ export const supabaseService = {
         const orderPayload = {
             user_id: userId,
             date: order.date,
-            product_id: order.productId,
-            customer_id: order.customerId,
-            vendor_id: order.vendorId,
+            product_id: order.productId || null,
+            customer_id: order.customerId || null,
+            vendor_id: order.vendorId || null,
             original_price: order.originalPrice,
             selling_price: order.sellingPrice,
             paid_by_driver: order.paidByDriver || false,
@@ -153,6 +155,10 @@ export const supabaseService = {
             pickup_charges: order.pickupCharges || 0,
             shipping_charges: order.shippingCharges || 0,
             status: order.status || 'Pending',
+            status_history: order.statusHistory || [{
+                status: order.status || 'Pending',
+                date: new Date().toISOString()
+            }],
             notes: order.notes,
             vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
             customer_payment_status: order.customerPaymentStatus || 'Udhar',
@@ -363,7 +369,9 @@ export const supabaseService = {
                 margin, marginPercentage: percentage, vendorPaymentStatus: o.vendor_payment_status, customerPaymentStatus: o.customer_payment_status,
                 pickupPaymentStatus: o.pickup_payment_status, pickupPersonName: o.pickup_person?.name,
                 trackingId: o.tracking_id, courierName: o.courier_name, pickupCharges: Number(o.pickup_charges), shippingCharges: Number(o.shipping_charges),
-                status: o.status, notes: o.notes, createdAt: new Date(o.created_at).getTime(),
+                status: o.status, notes: o.notes,
+                statusHistory: o.status_history,
+                createdAt: new Date(o.created_at).getTime(),
             };
         }) as Transaction[];
     },
@@ -396,6 +404,12 @@ export const supabaseService = {
             .select('*, product:directory!product_id(name), customer:directory!customer_id(name), vendor:directory!vendor_id(name), pickup_person:directory!pickup_person_id(name)')
             .eq('id', orderId).single();
         if (fetchError) throw fetchError;
+        const currentHistory = Array.isArray(order.status_history) ? order.status_history : [];
+        const newHistory = [...currentHistory, {
+            status: status as any,
+            date: new Date().toISOString()
+        }];
+
         const orderData: Order = {
             id: order.id, userId: order.user_id, date: order.date, productId: order.product_id, productName: order.product?.name || 'Unknown',
             customerId: order.customer_id, customerName: order.customer?.name || 'Unknown', vendorId: order.vendor_id, vendorName: order.vendor?.name || 'Unknown',
@@ -403,7 +417,9 @@ export const supabaseService = {
             paidByDriver: order.paid_by_driver, pickupPersonId: order.pickup_person_id, pickupPersonName: order.pickup_person?.name,
             trackingId: order.tracking_id, courierName: order.courier_name, pickupCharges: Number(order.pickup_charges), shippingCharges: Number(order.shipping_charges),
             status: status as any, notes: order.notes, customerPaymentStatus: order.customer_payment_status, vendorPaymentStatus: order.vendor_payment_status,
-            pickupPaymentStatus: order.pickup_payment_status, createdAt: new Date(order.created_at).getTime(),
+            pickupPaymentStatus: order.pickup_payment_status,
+            statusHistory: newHistory,
+            createdAt: new Date(order.created_at).getTime(),
         };
         await this.saveOrder(orderData, order.user_id);
     },

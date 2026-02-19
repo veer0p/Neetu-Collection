@@ -1,3 +1,8 @@
+export interface StatusHistoryEntry {
+    status: OrderStatus;
+    date: string;
+}
+
 export interface Transaction {
     id: string;
     date: string;
@@ -18,6 +23,7 @@ export interface Transaction {
     shippingCharges?: number;
     status: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
     notes?: string;
+    statusHistory?: StatusHistoryEntry[];
     createdAt: number;
 }
 export type OrderStatus = 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
@@ -47,6 +53,7 @@ export interface Order {
     customerPaymentStatus?: 'Paid' | 'Udhar';
     pickupPaymentStatus?: 'Paid' | 'Udhar';
     notes?: string;
+    statusHistory?: StatusHistoryEntry[];
     createdAt: number;
 }
 

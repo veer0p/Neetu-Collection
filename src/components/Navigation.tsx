@@ -9,6 +9,15 @@ import { supabaseService } from '../store/supabaseService';
 import { MainTabs } from './MainTabs';
 import { useTheme } from '../context/ThemeContext';
 
+import Dashboard from '../screens/Dashboard';
+import AddEntry from '../screens/AddEntry';
+import Transactions from '../screens/Transactions';
+import Ledger from '../screens/Ledger';
+import AccountDetail from '../screens/AccountDetail';
+import OrderDetail from '../screens/OrderDetail';
+import Directory from '../screens/Directory';
+import Reports from '../screens/Reports';
+
 const Stack = createNativeStackNavigator();
 
 const LightTheme = {
@@ -79,7 +88,7 @@ export const AppNavigation = () => {
 
     return (
         <NavigationContainer theme={isDark ? DarkTheme : LightTheme}>
-            <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
+            <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
                 {!user ? (
                     <Stack.Screen name="Login">
                         {(props) => <Login {...props} onLoginSuccess={(userData) => setUser(userData)} />}
@@ -89,9 +98,16 @@ export const AppNavigation = () => {
                         {(props) => <LockScreen {...props} onUnlock={() => setHasUnlocked(true)} />}
                     </Stack.Screen>
                 ) : (
-                    <Stack.Screen name="Main">
-                        {(props) => <MainTabs {...props} user={user} onLogout={handleLogout} />}
-                    </Stack.Screen>
+                    <>
+                        <Stack.Screen name="Main">
+                            {(props) => <MainTabs {...props} user={user} onLogout={handleLogout} />}
+                        </Stack.Screen>
+                        <Stack.Screen name="AccountDetail" component={AccountDetail} />
+                        <Stack.Screen name="OrderDetail" component={OrderDetail} />
+                        <Stack.Screen name="Directory" component={Directory} />
+                        <Stack.Screen name="Insights" component={Reports} />
+                        <Stack.Screen name="AddEntry" component={AddEntry} />
+                    </>
                 )}
             </Stack.Navigator>
         </NavigationContainer>
