@@ -9,10 +9,12 @@ import { Button } from '../components/Button';
 import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
 import { DirectoryItem, LedgerEntry } from '../utils/types';
-import { ArrowLeft, Plus, IndianRupee, FileText, TrendingUp, TrendingDown, X } from 'lucide-react-native';
+import { ArrowLeft, Plus, IndianRupee, FileText, TrendingUp, TrendingDown, X, Trash2, Lock } from 'lucide-react-native';
+
 import { useRoute } from '@react-navigation/native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 export default function AccountDetail({ navigation }: { navigation: any }) {
     const route = useRoute();
@@ -32,6 +34,12 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
     const [editNotes, setEditNotes] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('All');
     const [fullBalance, setFullBalance] = useState(0);
+    const [confirmSettleVisible, setConfirmSettleVisible] = useState(false);
+    const [settleEntry, setSettleEntry] = useState<LedgerEntry | null>(null);
+    const [settleLoading, setSettleLoading] = useState(false);
+    const [deleteEntryVisible, setDeleteEntryVisible] = useState(false);
+    const [deleteEntry, setDeleteEntry] = useState<LedgerEntry | null>(null);
+    const [deleteEntryLoading, setDeleteEntryLoading] = useState(false);
 
     useEffect(() => { loadLedger(); }, []);
     useFocusEffect(useCallback(() => { loadLedger(); }, []));
@@ -83,6 +91,68 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
         if (item.orderId) { setOrderModalVisible(true); }
         else { setEditNotes(item.notes || ''); setEditModalVisible(true); }
     };
+
+    const handleQuickSettle = async (item: LedgerEntry) => {
+        // If entry is linked to an order, use idempotent rebuild via updateOrderPaymentStatus
+        if (item.orderId) {
+            setSettleEntry(item);
+            setConfirmSettleVisible(true);
+        } else {
+            // For manual ledger entries (no orderId), still use addPayment
+            setSettleEntry(item);
+            setConfirmSettleVisible(true);
+        }
+    };
+
+    const confirmEntrySettle = async () => {
+        if (!userId || !settleEntry) return;
+        setSettleLoading(true);
+
+        try {
+            if (settleEntry.orderId) {
+                let field: 'customer' | 'vendor' | 'pickup' = 'customer';
+                if (settleEntry.transactionType === 'Purchase') field = 'vendor';
+                else if (settleEntry.transactionType === 'Reimbursement' || settleEntry.transactionType === 'Expense') field = 'pickup';
+                await supabaseService.updateOrderPaymentStatus(settleEntry.orderId, field, 'Paid');
+            } else {
+                const isReceivable = settleEntry.amount > 0;
+                const settleType = isReceivable ? 'PaymentIn' : 'PaymentOut';
+                const settleAmount = -settleEntry.amount;
+                await supabaseService.addPayment({
+                    personId: person.id, amount: settleAmount,
+                    transactionType: settleType,
+                    notes: `Quick settle: ${settleEntry.transactionType}${settleEntry.orderProductName ? ' - ' + settleEntry.orderProductName : ''}`
+                }, userId);
+            }
+            await loadLedger();
+            setConfirmSettleVisible(false);
+        } catch (e) {
+            console.error('Quick settle failed:', e);
+        } finally {
+            setSettleLoading(false);
+        }
+    };
+
+    const handleDeleteEntry = (item: LedgerEntry) => {
+        setDeleteEntry(item);
+        setDeleteEntryVisible(true);
+    };
+
+    const confirmDeleteEntry = async () => {
+        if (!deleteEntry) return;
+        setDeleteEntryLoading(true);
+        try {
+            await supabaseService.deleteLedgerEntry(deleteEntry.id);
+            await loadLedger();
+            setDeleteEntryVisible(false);
+        } catch (e) {
+            console.error('Delete entry failed:', e);
+        } finally {
+            setDeleteEntryLoading(false);
+        }
+    };
+
+
 
     const filterTypes = ['All', 'Sale', 'Purchase', 'PaymentIn', 'PaymentOut'];
 
@@ -178,16 +248,69 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                                     {item.amount < 0 ? <TrendingUp size={20} color="#10B981" /> : <TrendingDown size={20} color="#EF4444" />}
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.transactionType}</Text>
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5" numberOfLines={1}>{item.notes || 'No notes'}</Text>
-                                </View>
-                                <View className="items-end">
-                                    <Text className={cn("font-sans-bold text-base", item.amount < 0 ? "text-success" : "text-danger")}>
-                                        {item.amount < 0 ? '-' : '+'}₹{Math.abs(item.amount).toLocaleString()}
-                                    </Text>
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] mt-0.5">
-                                        {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                    </Text>
+                                    <View className="flex-row items-center justify-between">
+                                        <View className="flex-1 mr-2">
+                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.transactionType}</Text>
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5" numberOfLines={1}>{item.notes || 'No notes'}</Text>
+                                        </View>
+                                        <View className="items-end">
+                                            <View className="flex-row items-center gap-2">
+                                                <Text className={cn("font-sans-bold text-base", item.amount < 0 ? "text-success" : "text-danger")}>
+                                                    {item.amount < 0 ? '-' : '+'}₹{Math.abs(item.amount).toLocaleString()}
+                                                </Text>
+                                                {/* Delete button — only for manual (non-order-linked) entries */}
+                                                {!item.orderId ? (
+                                                    <TouchableOpacity
+                                                        onPress={(e) => { e.stopPropagation(); handleDeleteEntry(item); }}
+                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                        className="w-7 h-7 rounded-lg bg-danger/10 items-center justify-center"
+                                                    >
+                                                        <Trash2 size={13} color="#EF4444" />
+                                                    </TouchableOpacity>
+                                                ) : (
+                                                    <View className="w-7 h-7 items-center justify-center opacity-30">
+                                                        <Lock size={13} color={isDark ? '#94A3B8' : '#6B7280'} />
+                                                    </View>
+                                                )}
+                                            </View>
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] mt-0.5">
+                                                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Quick Actions - only show settle button for unmatched entries */}
+                                    {['Sale', 'Purchase', 'Reimbursement', 'Expense'].includes(item.transactionType) && (
+                                        <View className="flex-row mt-2 items-center gap-2">
+                                            {/* Check if this order-linked entry is already matched by a PaymentIn/Out sibling */}
+                                            {item.orderStatus === 'Canceled' ? (
+                                                <View className="px-2 py-0.5 rounded-lg bg-danger/10">
+                                                    <Text className="text-danger font-sans-bold text-[10px] uppercase">Canceled</Text>
+                                                </View>
+                                            ) : (
+                                                <TouchableOpacity
+                                                    onPress={(e) => {
+                                                        e.stopPropagation();
+                                                        handleQuickSettle(item);
+                                                    }}
+                                                    className={cn(
+                                                        "px-3 py-1 rounded-lg flex-row items-center",
+                                                        item.amount > 0 ? "bg-success/20 border border-success/30" : "bg-danger/20 border border-danger/30"
+                                                    )}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <Text className={cn("font-sans-bold text-[10px] uppercase", item.amount > 0 ? "text-success" : "text-danger")}>
+                                                        {item.amount > 0 ? "Mark Received" : "Mark Paid"}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            )}
+                                            {item.orderId && (
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">
+                                                    {item.orderProductName || 'Order linked'}
+                                                </Text>
+                                            )}
+                                        </View>
+                                    )}
                                 </View>
                             </TouchableOpacity>
                         )}
@@ -305,6 +428,28 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                     </View>
                 </Modal>
             </SafeAreaView>
+
+            <ConfirmDialog
+                visible={confirmSettleVisible}
+                title="Confirm Payment"
+                message={`Mark ₹${Math.abs(settleEntry?.amount || 0).toLocaleString()} as ${settleEntry?.amount && settleEntry.amount > 0 ? 'Received' : 'Paid'}?`}
+                onConfirm={confirmEntrySettle}
+                onCancel={() => setConfirmSettleVisible(false)}
+                confirmText={settleEntry?.amount && settleEntry.amount > 0 ? "Mark Received" : "Mark Paid"}
+                type="success"
+                loading={settleLoading}
+            />
+            <ConfirmDialog
+                visible={deleteEntryVisible}
+                title="Delete Transaction?"
+                message="This will permanently delete this manual payment entry. This cannot be undone."
+                onConfirm={confirmDeleteEntry}
+                onCancel={() => setDeleteEntryVisible(false)}
+                confirmText="Delete"
+                type="danger"
+                loading={deleteEntryLoading}
+            />
         </Background>
     );
 }
+

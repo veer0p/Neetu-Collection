@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
@@ -9,6 +9,7 @@ import { useTransactions } from '../hooks/useTransactions';
 import { Search, ChevronRight } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 type FilterTab = 'all' | 'customers' | 'vendors' | 'pickup';
 
@@ -19,6 +20,9 @@ export default function Ledger({ navigation }: { navigation: any }) {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filter, setFilter] = useState<FilterTab>('all');
+    const [confirmVisible, setConfirmVisible] = useState(false);
+    const [selectedAccount, setSelectedAccount] = useState<any>(null);
+    const [settleLoading, setSettleLoading] = useState(false);
 
     const loadData = async () => {
         if (!userId) return;
@@ -26,6 +30,33 @@ export default function Ledger({ navigation }: { navigation: any }) {
         const data = await supabaseService.getDirectoryWithBalances(userId);
         setAccounts(data);
         setLoading(false);
+    };
+
+    const handleQuickSettle = async (item: any) => {
+        setSelectedAccount(item);
+        setConfirmVisible(true);
+    };
+
+    const confirmSettle = async () => {
+        if (!userId || !selectedAccount || !selectedAccount.balance) return;
+        setSettleLoading(true);
+        const isReceivable = selectedAccount.balance > 0;
+        const type = isReceivable ? 'PaymentIn' : 'PaymentOut';
+
+        try {
+            await supabaseService.addPayment({
+                personId: selectedAccount.id,
+                amount: -selectedAccount.balance,
+                transactionType: type,
+                notes: 'Full settlement'
+            }, userId);
+            await loadData();
+            setConfirmVisible(false);
+        } catch (e) {
+            console.error('Settlement failed:', e);
+        } finally {
+            setSettleLoading(false);
+        }
     };
 
     useFocusEffect(useCallback(() => { loadData(); }, [userId]));
@@ -63,13 +94,34 @@ export default function Ledger({ navigation }: { navigation: any }) {
                 <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.name}</Text>
                 <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5">{item.type}</Text>
             </View>
-            <View className="flex-row items-center gap-2">
-                <Text className={cn(
-                    "font-sans-bold text-base",
-                    isPayable ? "text-danger" : "text-success"
-                )}>
-                    ₹{Math.abs(item.balance || 0).toLocaleString()}
-                </Text>
+            <View className="flex-row items-center gap-3">
+                <View className="items-end">
+                    <Text className={cn(
+                        "font-sans-bold text-base",
+                        isPayable ? "text-danger" : "text-success"
+                    )}>
+                        ₹{Math.abs(item.balance || 0).toLocaleString()}
+                    </Text>
+                    {item.balance !== 0 && (
+                        <TouchableOpacity
+                            onPress={(e) => {
+                                e.stopPropagation();
+                                handleQuickSettle(item);
+                            }}
+                            className={cn(
+                                "mt-1 px-2 py-0.5 rounded-md",
+                                isPayable ? "bg-danger/10" : "bg-success/10"
+                            )}
+                        >
+                            <Text className={cn(
+                                "font-sans-bold text-[9px] uppercase",
+                                isPayable ? "text-danger" : "text-success"
+                            )}>
+                                {isPayable ? "Paid?" : "Recv?"}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
                 <ChevronRight size={16} color="#9CA3AF" />
             </View>
         </TouchableOpacity>
@@ -169,6 +221,17 @@ export default function Ledger({ navigation }: { navigation: any }) {
                         }
                     />
                 )}
+
+                <ConfirmDialog
+                    visible={confirmVisible}
+                    title="Confirm Settlement"
+                    message={`Are you sure you want to mark ₹${Math.abs(selectedAccount?.balance || 0).toLocaleString()} as ${selectedAccount?.balance > 0 ? 'Received' : 'Paid'} for ${selectedAccount?.name}?`}
+                    onConfirm={confirmSettle}
+                    onCancel={() => setConfirmVisible(false)}
+                    confirmText={selectedAccount?.balance > 0 ? "Mark Received" : "Mark Paid"}
+                    type="success"
+                    loading={settleLoading}
+                />
             </SafeAreaView>
         </Background>
     );

@@ -35,6 +35,28 @@ export default function OrderDetail({ route, navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [deleteVisible, setDeleteVisible] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [updatingPayment, setUpdatingPayment] = useState<string | null>(null);
+
+    const handlePaymentToggle = async (field: 'customer' | 'vendor' | 'pickup', current: string) => {
+        if (!order?.id || updatingPayment) return;
+        const newStatus = current === 'Paid' ? 'Udhar' : 'Paid';
+        setUpdatingPayment(field);
+        try {
+            await supabaseService.updateOrderPaymentStatus(order.id, field, newStatus);
+            // Update local state immediately for a snappy feel
+            setOrder((prev: any) => ({
+                ...prev,
+                customerPaymentStatus: field === 'customer' ? newStatus : prev.customerPaymentStatus,
+                vendorPaymentStatus: field === 'vendor' ? newStatus : prev.vendorPaymentStatus,
+                pickupPaymentStatus: field === 'pickup' ? newStatus : prev.pickupPaymentStatus,
+            }));
+            await loadData();
+        } catch (e) {
+            console.error('Payment toggle failed:', e);
+        } finally {
+            setUpdatingPayment(null);
+        }
+    };
 
     useEffect(() => {
         if (orderId) {
@@ -129,14 +151,40 @@ export default function OrderDetail({ route, navigation }: any) {
                             </Text>
                         </Card>
 
-                        {/* Payment Status */}
-                        <View className="flex-row gap-4 mb-4">
-                            <Card className="flex-1 p-4 flex-row items-center justify-around">
-                                <StatusDot label="Customer" status={order.customerPaymentStatus} />
-                                <View className="w-px h-8 bg-divider dark:bg-divider-dark" />
-                                <StatusDot label="Vendor" status={order.vendorPaymentStatus} />
-                                <View className="w-px h-8 bg-divider dark:bg-divider-dark" />
-                                <StatusDot label="Pickup" status={order.pickupPaymentStatus || 'Paid'} />
+                        {/* Payment Status - Interactive Toggles */}
+                        <View className="mb-4">
+                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-2 ml-1">Payment Status</Text>
+                            <Card className="p-4">
+                                {[
+                                    { key: 'customer' as const, label: 'Customer', status: order.customerPaymentStatus },
+                                    { key: 'vendor' as const, label: 'Vendor', status: order.vendorPaymentStatus },
+                                    ...(order.pickupPersonName ? [{ key: 'pickup' as const, label: 'Pickup', status: order.pickupPaymentStatus || 'Paid' }] : []),
+                                ].map((item, idx, arr) => (
+                                    <View key={item.key} className={cn("flex-row items-center justify-between py-3", idx < arr.length - 1 && "border-b border-divider dark:border-divider-dark")}>
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">{item.label}</Text>
+                                        <TouchableOpacity
+                                            onPress={() => handlePaymentToggle(item.key, item.status)}
+                                            disabled={!!updatingPayment}
+                                            className={cn(
+                                                "flex-row items-center px-4 py-1.5 rounded-full",
+                                                item.status === 'Paid'
+                                                    ? "bg-success/15 border border-success/30"
+                                                    : "bg-warning/15 border border-warning/30"
+                                            )}
+                                        >
+                                            {updatingPayment === item.key ? (
+                                                <ActivityIndicator size={12} color={item.status === 'Paid' ? '#10B981' : '#F59E0B'} />
+                                            ) : (
+                                                <>
+                                                    <View className={cn("w-2 h-2 rounded-full mr-2", item.status === 'Paid' ? 'bg-success' : 'bg-warning')} />
+                                                    <Text className={cn("font-sans-bold text-xs", item.status === 'Paid' ? 'text-success' : 'text-warning')}>
+                                                        {item.status || 'Udhar'}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+                                    </View>
+                                ))}
                             </Card>
                         </View>
 
@@ -152,6 +200,14 @@ export default function OrderDetail({ route, navigation }: any) {
                             {order.pickupCharges > 0 && <InfoRow label="Pickup Charges" value={`₹${Number(order.pickupCharges).toLocaleString()}`} valueColor="text-danger" />}
                             {order.shippingCharges > 0 && <InfoRow label="Shipping" value={`₹${Number(order.shippingCharges).toLocaleString()}`} valueColor="text-danger" />}
                         </Card>
+
+                        {(order.trackingId || order.courierName) && (
+                            <Card className="p-4 mb-4">
+                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-base mb-2">Shipping Info</Text>
+                                {order.trackingId && <InfoRow label="Tracking ID" value={order.trackingId} />}
+                                {order.courierName && <InfoRow label="Courier" value={order.courierName} />}
+                            </Card>
+                        )}
 
                         {/* Status Timeline */}
                         <View className="mt-6 mb-2">

@@ -5,12 +5,40 @@ import { Background } from '../components/Background';
 import { Card } from '../components/Card';
 import { useBiometrics } from '../hooks/useBiometrics';
 import { useTheme } from '../context/ThemeContext';
-import { Fingerprint, LogOut, ChevronRight, Info, Moon, Sun, User as UserIcon, Bell, Shield, Database } from 'lucide-react-native';
+import { Fingerprint, LogOut, ChevronRight, Info, Moon, Sun, User as UserIcon, Bell, Shield, Database, Sparkles } from 'lucide-react-native';
 import { cn } from '../utils/cn';
+import { supabaseService } from '../store/supabaseService';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useTransactions } from '../hooks/useTransactions';
+
 
 export default function Settings({ user, onLogout, navigation }: { user?: any; onLogout?: () => void; navigation: any }) {
     const { isEnabled, toggleBiometrics } = useBiometrics();
     const { theme, toggleTheme, isDark } = useTheme();
+    const { refresh } = useTransactions();
+    const [seeding, setSeeding] = React.useState(false);
+    const [seedConfirmVisible, setSeedConfirmVisible] = React.useState(false);
+
+    const handleSeed = async () => {
+        if (!user?.id) return;
+        setSeeding(true);
+        try {
+            await supabaseService.seedDemoData(user.id);
+            await refresh();
+            setSeedConfirmVisible(false);
+            import('react-native').then(({ Alert }) => {
+                Alert.alert('Success', 'Demo data seeded successfully! You can now see new orders and directory items.');
+            });
+        } catch (error: any) {
+            console.error('Seeding error:', error);
+            import('react-native').then(({ Alert }) => {
+                Alert.alert('Error', error?.message || 'Failed to seed data');
+            });
+        } finally {
+            setSeeding(false);
+        }
+    };
+
 
     const sections: { title: string; items: any[] }[] = [
         {
@@ -44,6 +72,12 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
                     onValueChange: () => { toggleTheme(); }
                 },
                 { icon: <Database size={20} color={isDark ? '#818CF8' : '#4F46E5'} />, label: 'Backup & Restore', subtitle: 'Cloud sync', onPress: () => { } },
+                {
+                    icon: <Sparkles size={20} color={isDark ? '#818CF8' : '#4F46E5'} />,
+                    label: 'Seed Demo Data',
+                    subtitle: 'Populate with realistic data',
+                    onPress: () => setSeedConfirmVisible(true)
+                },
             ]
         }
     ];
@@ -135,6 +169,17 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
                         </Card>
                     </View>
                 </ScrollView>
+
+                <ConfirmDialog
+                    visible={seedConfirmVisible}
+                    title="Seed Demo Data?"
+                    message="This will add several realistic orders, customers, and products to your account for testing. This cannot be easily undone."
+                    type="info"
+                    confirmText="Yes, Seed Data"
+                    onConfirm={handleSeed}
+                    onCancel={() => setSeedConfirmVisible(false)}
+                    loading={seeding}
+                />
             </SafeAreaView>
         </Background>
     );

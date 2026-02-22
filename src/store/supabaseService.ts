@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabase';
-import { Order, LedgerEntry, DirectoryItem, Transaction, calculateMargin } from '../utils/types';
+import { Order, LedgerEntry, DirectoryItem, Transaction, calculateMargin, OrderStatus } from '../utils/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const USER_STORAGE_KEY = '@neetu_collection_user';
@@ -140,34 +140,44 @@ export const supabaseService = {
     async saveOrder(order: Partial<Order>, userId: string): Promise<void> {
         const isUpdate = !!order.id;
         const margin = (order.sellingPrice || 0) - (order.originalPrice || 0) - (order.pickupCharges || 0) - (order.shippingCharges || 0);
-        const orderPayload = {
-            user_id: userId,
-            date: order.date,
-            product_id: order.productId || null,
-            customer_id: order.customerId || null,
-            vendor_id: order.vendorId || null,
-            original_price: order.originalPrice,
-            selling_price: order.sellingPrice,
-            paid_by_driver: order.paidByDriver || false,
-            pickup_person_id: order.pickupPersonId || null,
-            tracking_id: order.trackingId,
-            courier_name: order.courierName,
-            pickup_charges: order.pickupCharges || 0,
-            shipping_charges: order.shippingCharges || 0,
-            status: order.status || 'Pending',
-            status_history: order.statusHistory || [{
-                status: order.status || 'Pending',
-                date: new Date().toISOString()
-            }],
-            notes: order.notes,
-            vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
-            customer_payment_status: order.customerPaymentStatus || 'Udhar',
-            pickup_payment_status: order.pickupPaymentStatus || 'Paid',
-            margin,
-        };
 
         let savedOrder;
         if (isUpdate) {
+            // Fetch existing order to preserve its status history
+            const { data: existing } = await supabase.from('orders').select('status_history').eq('id', order.id).single();
+            let history = existing?.status_history || [];
+
+            // Only append to history if status has changed or history is empty
+            if (order.status && (!history.length || history[history.length - 1].status !== order.status)) {
+                history.push({
+                    status: order.status,
+                    date: new Date().toISOString()
+                });
+            }
+
+            const orderPayload = {
+                user_id: userId,
+                date: order.date,
+                product_id: order.productId || null,
+                customer_id: order.customerId || null,
+                vendor_id: order.vendorId || null,
+                original_price: order.originalPrice,
+                selling_price: order.sellingPrice,
+                paid_by_driver: order.paidByDriver || false,
+                pickup_person_id: order.pickupPersonId || null,
+                tracking_id: order.trackingId,
+                courier_name: order.courierName,
+                pickup_charges: order.pickupCharges || 0,
+                shipping_charges: order.shippingCharges || 0,
+                status: order.status || 'Pending',
+                status_history: history,
+                notes: order.notes,
+                vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
+                customer_payment_status: order.customerPaymentStatus || 'Udhar',
+                pickup_payment_status: order.pickupPaymentStatus || 'Paid',
+                margin,
+            };
+
             const { data, error } = await supabase
                 .from('orders')
                 .update(orderPayload)
@@ -177,6 +187,32 @@ export const supabaseService = {
             if (error) throw error;
             savedOrder = data;
         } else {
+            const orderPayload = {
+                user_id: userId,
+                date: order.date,
+                product_id: order.productId || null,
+                customer_id: order.customerId || null,
+                vendor_id: order.vendorId || null,
+                original_price: order.originalPrice,
+                selling_price: order.sellingPrice,
+                paid_by_driver: order.paidByDriver || false,
+                pickup_person_id: order.pickupPersonId || null,
+                tracking_id: order.trackingId,
+                courier_name: order.courierName,
+                pickup_charges: order.pickupCharges || 0,
+                shipping_charges: order.shippingCharges || 0,
+                status: order.status || 'Pending',
+                status_history: order.statusHistory || [{
+                    status: order.status || 'Pending',
+                    date: new Date().toISOString()
+                }],
+                notes: order.notes,
+                vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
+                customer_payment_status: order.customerPaymentStatus || 'Udhar',
+                pickup_payment_status: order.pickupPaymentStatus || 'Paid',
+                margin,
+            };
+
             const { data, error } = await supabase
                 .from('orders')
                 .insert([orderPayload])
@@ -207,55 +243,55 @@ export const supabaseService = {
         const paidByDriver = order.paidByDriver || false;
 
         ledgerEntries.push({
-            user_id: userId, order_id: orderId, person_id: order.customerId,
+            user_id: userId, order_id: orderId, person_id: order.customerId || null,
             amount: sellingPrice, transaction_type: 'Sale',
         });
         ledgerEntries.push({
-            user_id: userId, order_id: orderId, person_id: order.vendorId,
+            user_id: userId, order_id: orderId, person_id: order.vendorId || null,
             amount: -originalPrice, transaction_type: 'Purchase',
         });
         if (!hasPickupPerson && shippingCharges > 0) {
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.vendorId,
+                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
                 amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges',
             });
         }
         if (hasPickupPerson && pickupCharges > 0) {
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
                 amount: -pickupCharges, transaction_type: 'Expense', notes: 'Pickup charges',
             });
         }
         if (hasPickupPerson && shippingCharges > 0) {
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
                 amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges',
             });
         }
         if (paidByDriver && hasPickupPerson) {
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.vendorId,
+                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
                 amount: originalPrice, transaction_type: 'PaymentOut', notes: 'Paid by driver',
             });
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
                 amount: -originalPrice, transaction_type: 'Reimbursement', notes: 'Product cost reimbursement',
             });
         }
         if (order.customerPaymentStatus === 'Paid') {
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.customerId,
+                user_id: userId, order_id: orderId, person_id: order.customerId || null,
                 amount: -sellingPrice, transaction_type: 'PaymentIn',
             });
         }
         if (order.vendorPaymentStatus === 'Paid' && !paidByDriver) {
             ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.vendorId,
+                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
                 amount: originalPrice, transaction_type: 'PaymentOut',
             });
             if (!hasPickupPerson && shippingCharges > 0) {
                 ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.vendorId,
+                    user_id: userId, order_id: orderId, person_id: order.vendorId || null,
                     amount: shippingCharges, transaction_type: 'PaymentOut', notes: 'Shipping settled',
                 });
             }
@@ -263,19 +299,19 @@ export const supabaseService = {
         if (order.pickupPaymentStatus === 'Paid' && hasPickupPerson) {
             if (pickupCharges > 0) {
                 ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
                     amount: pickupCharges, transaction_type: 'PaymentOut', notes: 'Pickup settled',
                 });
             }
             if (shippingCharges > 0) {
                 ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
                     amount: shippingCharges, transaction_type: 'PaymentOut', notes: 'Shipping settled',
                 });
             }
             if (paidByDriver) {
                 ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
                     amount: originalPrice, transaction_type: 'PaymentOut', notes: 'Product cost reimbursed',
                 });
             }
@@ -345,6 +381,12 @@ export const supabaseService = {
         const { error } = await supabase.from('ledger').update({ notes }).eq('id', id);
         if (error) throw error;
     },
+
+    async deleteLedgerEntry(id: string): Promise<void> {
+        const { error } = await supabase.from('ledger').delete().eq('id', id);
+        if (error) throw error;
+    },
+
 
     async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
         const { data: directoryData, error: directoryError } = await supabase
@@ -441,5 +483,92 @@ export const supabaseService = {
 
     async updateDirectoryItem(id: string, item: any): Promise<void> {
         await this.saveDirectoryItem({ ...item, id }, item.user_id);
+    },
+
+    // --- Demo Data Seeding ---
+    async seedDemoData(userId: string): Promise<void> {
+        // 1. Directory Data
+        const directory = [
+            { name: 'Bombay Selection', type: 'Vendor' },
+            { name: 'Laxmithree Sarees', type: 'Vendor' },
+            { name: 'Siyaram Fabrics', type: 'Vendor' },
+            { name: 'Surat Textiles', type: 'Vendor' },
+            { name: 'Anjali Sharma', type: 'Customer' },
+            { name: 'Rohan Mehta', type: 'Customer' },
+            { name: 'Priya Patel', type: 'Customer' },
+            { name: 'Vikram Singh', type: 'Customer' },
+            { name: 'Sunita Gupta', type: 'Customer' },
+            { name: 'Silk Saree', type: 'Product' },
+            { name: 'Cotton Kurti', type: 'Product' },
+            { name: 'Designer Lehenga', type: 'Product' },
+            { name: 'Men’s Suit', type: 'Product' },
+            { name: 'Dupatta Set', type: 'Product' },
+            { name: 'Bridal Gown', type: 'Product' },
+            { name: 'Rahul Express', type: 'Pickup Person' },
+            { name: 'Suresh Delivery', type: 'Pickup Person' },
+            { name: 'Metro Pickup', type: 'Pickup Person' },
+        ];
+
+        const { data: createdItems, error: dirError } = await supabase
+            .from('directory')
+            .upsert(directory.map(item => ({ ...item, user_id: userId })), { onConflict: 'user_id,name,type' })
+            .select();
+
+        if (dirError) throw dirError;
+
+        const getItems = (type: string) => createdItems.filter(i => i.type === type);
+        const vendors = getItems('Vendor');
+        const customers = getItems('Customer');
+        const products = getItems('Product');
+        const pickups = getItems('Pickup Person');
+
+        // 2. Orders Data (Generate 10 realistic orders)
+        const statuses: OrderStatus[] = ['Pending', 'Booked', 'Shipped', 'Delivered'];
+        const paymentStatuses: ('Paid' | 'Udhar')[] = ['Paid', 'Udhar'];
+
+        for (let i = 0; i < 15; i++) {
+            const product = products[Math.floor(Math.random() * products.length)];
+            const customer = customers[Math.floor(Math.random() * customers.length)];
+            const vendor = vendors[Math.floor(Math.random() * vendors.length)];
+            const status = statuses[Math.floor(Math.random() * statuses.length)];
+
+            // Dates within last 2 weeks
+            const d = new Date();
+            d.setDate(d.getDate() - Math.floor(Math.random() * 14));
+            const dateStr = d.toLocaleDateString('en-GB');
+
+            const originalPrice = 2000 + Math.floor(Math.random() * 5000);
+            const sellingPrice = originalPrice + 500 + Math.floor(Math.random() * 2000);
+
+            const hasPickup = Math.random() > 0.3;
+            const pickup = hasPickup ? pickups[Math.floor(Math.random() * pickups.length)] : null;
+            const pickupCharges = hasPickup ? 50 + Math.floor(Math.random() * 100) : 0;
+            const shippingCharges = 100 + Math.floor(Math.random() * 200);
+
+            const order: Partial<Order> = {
+                date: dateStr,
+                productId: product.id,
+                productName: product.name,
+                customerId: customer.id,
+                customerName: customer.name,
+                vendorId: vendor.id,
+                vendorName: vendor.name,
+                originalPrice,
+                sellingPrice,
+                status,
+                customerPaymentStatus: paymentStatuses[Math.floor(Math.random() * 2)],
+                vendorPaymentStatus: paymentStatuses[Math.floor(Math.random() * 2)],
+                pickupPersonId: pickup?.id,
+                pickupPersonName: pickup?.name,
+                pickupCharges,
+                shippingCharges,
+                pickupPaymentStatus: 'Paid',
+                notes: `System generated demo order #${i + 1}`,
+                courierName: status !== 'Pending' ? 'Delhivery' : '',
+                trackingId: status !== 'Pending' ? `AWB${Math.floor(100000 + Math.random() * 900000)}` : '',
+            };
+
+            await this.saveOrder(order, userId);
+        }
     },
 };
