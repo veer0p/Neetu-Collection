@@ -12,7 +12,7 @@ async function log(step, message) {
 }
 
 async function success(message) {
-    console.log(`   \x1b[32m✓\x1b[0m ${message}`);
+    console.log(`   \x1b[32m\x1b[0m ${message}`);
 }
 
 async function error(message) {

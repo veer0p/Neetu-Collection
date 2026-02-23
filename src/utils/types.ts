@@ -63,11 +63,14 @@ export interface LedgerEntry {
     orderId?: string;
     personId: string;
     amount: number; // Positive = Credit (owing/received), Negative = Debit (owed/paid)
-    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Reimbursement' | 'Expense';
+    transactionType: 'Sale' | 'Purchase' | 'PaymentIn' | 'PaymentOut' | 'Expense';
+
     notes?: string;
     orderProductName?: string; // Joined from orders
     orderStatus?: string;      // Joined from orders
     createdAt: number;
+    isSettled?: boolean;       // true when payment was marked as Paid at order creation
+    settledAt?: number;        // timestamp of when it was settled (payment time)
 }
 
 export interface DirectoryItem {

@@ -42,16 +42,11 @@ export default function Ledger({ navigation }: { navigation: any }) {
     const confirmSettle = async () => {
         if (!userId || !selectedAccount || !selectedAccount.balance) return;
         setSettleLoading(true);
-        const isReceivable = selectedAccount.balance > 0;
-        const type = isReceivable ? 'PaymentIn' : 'PaymentOut';
 
         try {
-            await supabaseService.addPayment({
-                personId: selectedAccount.id,
-                amount: -selectedAccount.balance,
-                transactionType: type,
-                notes: 'Full settlement'
-            }, userId);
+            // Mark all unsettled ledger entries for this person as settled
+            // No new PaymentIn/Out entries are created — balance becomes 0
+            await supabaseService.settleAllForPerson(selectedAccount.id, userId);
             await loadData();
             setConfirmVisible(false);
         } catch (e) {
@@ -148,7 +143,7 @@ export default function Ledger({ navigation }: { navigation: any }) {
                                 fontSize: 12, letterSpacing: 0.3,
                                 color: textColor,
                             }}>
-                                {isPayable ? '✓  Mark as Paid' : '✓  Mark as Received'}
+                                {isPayable ? '  Mark as Paid' : '  Mark as Received'}
                             </Text>
                         </TouchableOpacity>
                     )}

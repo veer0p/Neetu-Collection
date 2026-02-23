@@ -51,8 +51,12 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
         setLoading(true);
         const data = await supabaseService.getLedgerEntries(person.id);
 
-        // Calculate the TRUE balance from unfiltered data
-        const total = data.reduce((acc, curr) => acc + curr.amount, 0);
+        // Manual entries (order_id null) always count towards balance integrity.
+        // Order entries (linked to order_id) only count if not yet settled.
+        const total = data.reduce((acc, curr) => {
+            if (curr.orderId === null || !curr.isSettled) return acc + curr.amount;
+            return acc;
+        }, 0);
         setFullBalance(total);
 
         // For Vendor accounts: hide entries that are internally settled by driver
@@ -113,19 +117,18 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
 
         try {
             if (settleEntry.orderId) {
+                // Order-linked entry: update the order payment status which triggers a full ledger rebuild
+                // with is_settled flags set correctly on the rebuilt entries
                 let field: 'customer' | 'vendor' | 'pickup' = 'customer';
                 if (settleEntry.transactionType === 'Purchase') field = 'vendor';
-                else if (settleEntry.transactionType === 'Reimbursement' || settleEntry.transactionType === 'Expense') field = 'pickup';
+                else if (settleEntry.transactionType === 'Expense') {
+                    // Determine by person type: vendor shipping vs pickup charges/product cost
+                    field = person.type === 'Vendor' ? 'vendor' : 'pickup';
+                }
                 await supabaseService.updateOrderPaymentStatus(settleEntry.orderId, field, 'Paid');
             } else {
-                const isReceivable = settleEntry.amount > 0;
-                const settleType = isReceivable ? 'PaymentIn' : 'PaymentOut';
-                const settleAmount = -settleEntry.amount;
-                await supabaseService.addPayment({
-                    personId: person.id, amount: settleAmount,
-                    transactionType: settleType,
-                    notes: `Quick settle: ${settleEntry.transactionType}${settleEntry.orderProductName ? ' - ' + settleEntry.orderProductName : ''}`
-                }, userId);
+                // Manual entry (no orderId): just mark this single entry as settled in-place
+                await supabaseService.settleLedgerEntry(settleEntry.id, userId);
             }
             await loadLedger();
             setConfirmSettleVisible(false);
@@ -196,7 +199,7 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                         <Text className={cn("font-sans-semibold text-xs mt-1",
                             fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-secondary dark:text-secondary-dark"
                         )}>
-                            {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled ✓"}
+                            {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled "}
                         </Text>
                     </Card>
                 </View>
@@ -240,15 +243,18 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                         keyExtractor={item => item.id}
                         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
                         renderItem={({ item, index }) => {
-                            const isInflow = item.amount > 0;
-                            const isActionable = ['Sale', 'Purchase', 'Reimbursement', 'Expense'].includes(item.transactionType);
-                            const alreadySettled = isActionable && item.orderId
-                                ? ledger.some(e =>
-                                    e.orderId === item.orderId &&
-                                    (e.transactionType === 'PaymentIn' || e.transactionType === 'PaymentOut')
-                                )
-                                : false;
+                            // Inflow = money coming into our "pocket" (Sales or customer payments)
+                            // Outflow = money going out of our "pocket" (Purchases, expenses, or payments to vendors)
+                            const isInflow = ['Sale', 'PaymentIn'].includes(item.transactionType);
+                            const isActionable = ['Sale', 'Purchase', 'Expense'].includes(item.transactionType);
+
+                            // Only order-linked entries use the "isSettled" flag to hide from balance.
+                            // Manual entries are always considered part of the active running history.
+                            const alreadySettled = isActionable && item.orderId && (item.isSettled === true);
                             const isCanceled = item.orderStatus === 'Canceled';
+
+                            // Time display: for settled entries show payment time; for others show entry creation time
+                            const displayTime = alreadySettled && item.settledAt ? item.settledAt : item.createdAt;
 
                             return (
                                 <TouchableOpacity
@@ -291,14 +297,18 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                                             ) : null}
                                         </Text>
 
-                                        {/* Line 2: date + status pill or action button (all inline) */}
+                                        {/* Line 2: date + time + status pill or action button (all inline) */}
                                         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
                                             <Text style={{
                                                 fontFamily: 'PlusJakartaSans_400Regular',
                                                 fontSize: 11,
                                                 color: isDark ? '#64748B' : '#94A3B8',
                                             }}>
-                                                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                {new Date(displayTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                {' '}
+                                                <Text style={{ fontSize: 10 }}>
+                                                    {new Date(displayTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                </Text>
                                             </Text>
 
                                             {item.notes && !item.orderId ? (
@@ -491,8 +501,11 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                                 <View className="flex-row justify-between p-3 bg-background dark:bg-background-dark rounded-xl">
                                     <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">Amount</Text>
                                     <Text className={cn("font-sans-bold text-lg",
-                                        (selectedEntry?.amount || 0) < 0 ? "text-success" : "text-danger"
-                                    )}>₹{Math.abs(selectedEntry?.amount || 0).toLocaleString()}</Text>
+                                        ['Sale', 'PaymentIn'].includes(selectedEntry?.transactionType || '') ? "text-success" : "text-danger"
+                                    )}>
+                                        {['Sale', 'PaymentIn'].includes(selectedEntry?.transactionType || '') ? '+' : '-'}
+                                        ₹{Math.abs(selectedEntry?.amount || 0).toLocaleString()}
+                                    </Text>
                                 </View>
                             </View>
                             <Button variant="secondary" onPress={() => setOrderModalVisible(false)} className="w-full">

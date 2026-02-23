@@ -51,7 +51,7 @@ export const Button = ({
         <TouchableOpacity
             activeOpacity={0.7}
             className={cn(
-                "rounded-2xl px-6 flex-row items-center justify-center border transition-all active:scale-95",
+                "rounded-2xl px-6 h-12 flex-row items-center justify-center border transition-all active:scale-95",
                 variantClasses[variant as keyof typeof variantClasses],
                 className
             )}

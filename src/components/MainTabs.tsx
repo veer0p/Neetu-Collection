@@ -66,17 +66,18 @@ const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
 
     const renderScreen = () => {
         const nav = navigation as any;
+        const s = (C: any, extra?: object) => React.createElement(C, { navigation: nav, ...extra });
         switch (activeTab) {
-            case 'Home': return <Dashboard navigation={nav} route={{} as any} user={user} onLogout={onLogout} />;
-            case 'Orders': return <Transactions navigation={nav} route={{} as any} />;
-            case 'Add': return <AddEntry navigation={nav} route={{} as any} />;
-            case 'Ledger': return <Ledger navigation={nav} route={{} as any} />;
-            case 'Directory': return <Directory navigation={nav} route={{} as any} />;
-            case 'Insights': return <Reports navigation={nav} route={{} as any} />;
-            case 'Calculator': return <Calculator navigation={nav} route={{} as any} />;
-            case 'Calendar': return <Calendar navigation={nav} route={{} as any} />;
-            case 'Settings': return <Settings navigation={nav} route={{} as any} user={user} onLogout={onLogout} />;
-            default: return <Dashboard navigation={nav} route={{} as any} user={user} onLogout={onLogout} />;
+            case 'Home': return s(Dashboard, { user, onLogout });
+            case 'Orders': return s(Transactions);
+            case 'Add': return s(AddEntry);
+            case 'Ledger': return s(Ledger);
+            case 'Directory': return s(Directory);
+            case 'Insights': return s(Reports);
+            case 'Calculator': return s(Calculator);
+            case 'Calendar': return s(Calendar);
+            case 'Settings': return s(Settings, { user, onLogout });
+            default: return s(Dashboard, { user, onLogout });
         }
     };
 

@@ -244,76 +244,83 @@ export const supabaseService = {
 
         ledgerEntries.push({
             user_id: userId, order_id: orderId, person_id: order.customerId || null,
-            amount: sellingPrice, transaction_type: 'Sale',
+            amount: sellingPrice, transaction_type: 'Sale', is_settled: false,
         });
         ledgerEntries.push({
             user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-            amount: -originalPrice, transaction_type: 'Purchase',
+            amount: -originalPrice, transaction_type: 'Purchase', is_settled: false,
         });
         if (!hasPickupPerson && shippingCharges > 0) {
             ledgerEntries.push({
                 user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges',
+                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges', is_settled: false,
             });
         }
         if (hasPickupPerson && pickupCharges > 0) {
             ledgerEntries.push({
                 user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                amount: -pickupCharges, transaction_type: 'Expense', notes: 'Pickup charges',
+                amount: -pickupCharges, transaction_type: 'Expense', notes: 'Pickup charges', is_settled: false,
             });
         }
         if (hasPickupPerson && shippingCharges > 0) {
             ledgerEntries.push({
                 user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges',
+                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges', is_settled: false,
             });
         }
         if (paidByDriver && hasPickupPerson) {
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-                amount: originalPrice, transaction_type: 'PaymentOut', notes: 'Paid by driver',
-            });
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                amount: -originalPrice, transaction_type: 'Reimbursement', notes: 'Product cost reimbursement',
-            });
+            // Driver paid the vendor directly — mark the vendor's Purchase as settled immediately
+            // (shop owner does not owe vendor; driver handled it)
+            const purchaseEntry = ledgerEntries.find((e: any) =>
+                e.transaction_type === 'Purchase' && e.person_id === (order.vendorId || null)
+            );
+            if (purchaseEntry) {
+                purchaseEntry.is_settled = true;
+                purchaseEntry.settled_at = new Date().toISOString();
+            }
+            // Also mark vendor shipping expense as settled (driver covered it)
+            for (const e of ledgerEntries) {
+                if (e.person_id === (order.vendorId || null) && e.transaction_type === 'Expense') {
+                    e.is_settled = true;
+                    e.settled_at = new Date().toISOString();
+                }
+            }
+            // Shop owner now owes driver the product cost — track as Expense on pickup person
+            if (originalPrice > 0) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
+                    amount: -originalPrice, transaction_type: 'Expense',
+                    notes: 'Product cost (paid by driver)', is_settled: false,
+                });
+            }
         }
         if (order.customerPaymentStatus === 'Paid') {
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.customerId || null,
-                amount: -sellingPrice, transaction_type: 'PaymentIn',
-            });
+            // Mark Sale as settled instead of adding a PaymentIn entry
+            const saleEntry = ledgerEntries.find((e: any) => e.transaction_type === 'Sale' && e.person_id === (order.customerId || null));
+            if (saleEntry) { saleEntry.is_settled = true; saleEntry.settled_at = new Date().toISOString(); }
         }
         if (order.vendorPaymentStatus === 'Paid' && !paidByDriver) {
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-                amount: originalPrice, transaction_type: 'PaymentOut',
-            });
-            if (!hasPickupPerson && shippingCharges > 0) {
-                ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-                    amount: shippingCharges, transaction_type: 'PaymentOut', notes: 'Shipping settled',
-                });
+            // Mark Purchase and Expense (shipping on vendor) as settled instead of adding PaymentOut entries
+            for (const e of ledgerEntries) {
+                if (
+                    e.person_id === (order.vendorId || null) &&
+                    (e.transaction_type === 'Purchase' || e.transaction_type === 'Expense')
+                ) {
+                    e.is_settled = true;
+                    e.settled_at = new Date().toISOString();
+                }
             }
         }
         if (order.pickupPaymentStatus === 'Paid' && hasPickupPerson) {
-            if (pickupCharges > 0) {
-                ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                    amount: pickupCharges, transaction_type: 'PaymentOut', notes: 'Pickup settled',
-                });
-            }
-            if (shippingCharges > 0) {
-                ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                    amount: shippingCharges, transaction_type: 'PaymentOut', notes: 'Shipping settled',
-                });
-            }
-            if (paidByDriver) {
-                ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                    amount: originalPrice, transaction_type: 'PaymentOut', notes: 'Product cost reimbursed',
-                });
+            // Mark ALL Expense entries for pickup person as settled (pickup charges, shipping, and product cost if paidByDriver)
+            for (const e of ledgerEntries) {
+                if (
+                    e.person_id === (order.pickupPersonId || null) &&
+                    e.transaction_type === 'Expense'
+                ) {
+                    e.is_settled = true;
+                    e.settled_at = new Date().toISOString();
+                }
             }
         }
         const { error: ledgerError } = await supabase.from('ledger').insert(ledgerEntries);
@@ -333,6 +340,8 @@ export const supabaseService = {
             amount: Number(item.amount), transactionType: item.transaction_type as any, notes: item.notes,
             orderProductName: item.order?.product?.name, orderStatus: item.order?.status,
             createdAt: new Date(item.created_at).getTime(),
+            isSettled: item.is_settled ?? false,
+            settledAt: item.settled_at ? new Date(item.settled_at).getTime() : undefined,
         })) as LedgerEntry[];
     },
 
@@ -355,7 +364,8 @@ export const supabaseService = {
     async addPayment(entry: Partial<LedgerEntry>, userId: string): Promise<void> {
         const { error } = await supabase.from('ledger').insert([{
             user_id: userId, person_id: entry.personId, amount: entry.amount,
-            transaction_type: entry.transactionType, notes: entry.notes
+            transaction_type: entry.transactionType, notes: entry.notes,
+            is_settled: false,
         }]);
         if (error) throw error;
     },
@@ -387,13 +397,96 @@ export const supabaseService = {
         if (error) throw error;
     },
 
+    async settleLedgerEntry(id: string, userId: string): Promise<void> {
+        // Fetch the entry first to check if it's manual (no order_id)
+        const { data: entry, error: fetchErr } = await supabase
+            .from('ledger')
+            .select('order_id, amount, person_id')
+            .eq('id', id)
+            .single();
+        if (fetchErr) throw fetchErr;
+
+        const now = new Date().toISOString();
+
+        if (!entry.order_id) {
+            // Manual entry: create counter payment record to balance the account
+            const amount = Number(entry.amount);
+            const counterType = amount > 0 ? 'PaymentIn' : 'PaymentOut';
+            const { error: insertErr } = await supabase.from('ledger').insert([{
+                user_id: userId,
+                person_id: entry.person_id,
+                amount: -amount,
+                transaction_type: counterType,
+                notes: 'Quick settle',
+                is_settled: false, // Manual entries are always "unsettled" to maintain balance integrity
+            }]);
+            if (insertErr) throw insertErr;
+        } else {
+            // Order-linked entry: mark as settled
+            const { error: updateErr } = await supabase
+                .from('ledger')
+                .update({ is_settled: true, settled_at: now })
+                .eq('id', id);
+            if (updateErr) throw updateErr;
+        }
+    },
+
+    async settleAllForPerson(personId: string, userId: string): Promise<void> {
+        const now = new Date().toISOString();
+
+        // Fetch all unsettled entries for this person
+        const { data: unsettled, error: fetchErr } = await supabase
+            .from('ledger')
+            .select('id, amount, order_id')
+            .eq('person_id', personId)
+            .eq('is_settled', false);
+        if (fetchErr) throw fetchErr;
+        if (!unsettled || unsettled.length === 0) return;
+
+        const orderLinked = unsettled.filter((e: any) => !!e.order_id);
+        const manual = unsettled.filter((e: any) => !e.order_id);
+
+        // Order-linked entries: just mark as settled (no new entry — order tracks status)
+        if (orderLinked.length > 0) {
+            const ids = orderLinked.map((e: any) => e.id);
+            const { error } = await supabase
+                .from('ledger')
+                .update({ is_settled: true, settled_at: now })
+                .in('id', ids);
+            if (error) throw error;
+        }
+
+        // Manual entries: create a counter balance record
+        if (manual.length > 0) {
+            const netAmount = manual.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
+            if (netAmount !== 0) {
+                const counterType = netAmount > 0 ? 'PaymentIn' : 'PaymentOut';
+                const { error: insertErr } = await supabase.from('ledger').insert([{
+                    user_id: userId,
+                    person_id: personId,
+                    amount: -netAmount,
+                    transaction_type: counterType,
+                    notes: 'Settlement',
+                    is_settled: false,
+                }]);
+                if (insertErr) throw insertErr;
+            }
+            // We do NOT mark original manual entries as settled. 
+            // They remain in the history as balanced entries.
+        }
+    },
 
     async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
         const { data: directoryData, error: directoryError } = await supabase
-            .from('directory').select('*, ledger:ledger(amount)').eq('user_id', userId);
+            .from('directory').select('*, ledger:ledger(amount, is_settled, order_id)').eq('user_id', userId);
         if (directoryError) return [];
         return (directoryData || []).map((item: any) => ({
-            ...item, balance: (item.ledger || []).reduce((acc: number, l: any) => acc + Number(l.amount), 0),
+            ...item, balance: (item.ledger || []).reduce((acc: number, l: any) => {
+                // Manual entries (order_id null) always count.
+                // Order entries only count if not settled.
+                if (l.order_id === null || !l.is_settled) return acc + Number(l.amount);
+                return acc;
+            }, 0),
             createdAt: new Date(item.created_at).getTime()
         })) as DirectoryItem[];
     },

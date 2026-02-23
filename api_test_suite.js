@@ -38,7 +38,7 @@ async function runTest(id, module, name, fn) {
         await fn();
         const dur = Date.now() - start;
         results.push({ id, module, name, passed: true, duration: dur });
-        console.log(`  ${green('✓')} ${dim(id)} ${name} ${dim(`(${dur}ms)`)}`);
+        console.log(`  ${green('')} ${dim(id)} ${name} ${dim(`(${dur}ms)`)}`);
     } catch (err) {
         const dur = Date.now() - start;
         results.push({ id, module, name, passed: false, error: err.message, duration: dur });
@@ -176,7 +176,7 @@ async function cleanup() {
     await supabase.from('directory').delete().eq('user_id', USER_ID).ilike('name', `${TEST_PREFIX}%`);
     // Delete test profile
     await supabase.from('profiles').delete().eq('phone', TEST_PHONE);
-    console.log(green('  ✓ Cleanup complete\n'));
+    console.log(green('   Cleanup complete\n'));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -588,7 +588,7 @@ async function finalCleanup() {
     await supabase.from('ledger').delete().ilike('notes', `%${TEST_PREFIX}%`);
     await supabase.from('directory').delete().eq('user_id', USER_ID).ilike('name', `${TEST_PREFIX}%`);
     await supabase.from('profiles').delete().eq('phone', TEST_PHONE);
-    console.log(green('  ✓ All test data removed\n'));
+    console.log(green('   All test data removed\n'));
 }
 
 // ─── Main Runner ─────────────────────────────────────────

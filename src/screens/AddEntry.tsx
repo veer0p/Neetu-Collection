@@ -232,7 +232,7 @@ export default function AddEntry({ route, navigation }: any) {
     const renderSuggestions = (type: string) => {
         if (suggestions.type !== type || suggestions.data.length === 0) return null;
         return (
-            <View className="bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-xl mt-1 overflow-hidden shadow-sm">
+            <View className="bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-b-xl overflow-hidden shadow-sm mb-4">
                 {suggestions.data.map((item, idx) => (
                     <TouchableOpacity
                         key={idx}
@@ -391,6 +391,7 @@ export default function AddEntry({ route, navigation }: any) {
                                 leftIcon={<Package size={18} color="#9CA3AF" />}
                                 returnKeyType="next"
                                 onSubmitEditing={() => customerRef.current?.focus()}
+                                className={suggestions.type === 'product' ? 'mb-0 rounded-b-none' : ''}
                             />
                             {renderSuggestions('product')}
 
@@ -403,6 +404,7 @@ export default function AddEntry({ route, navigation }: any) {
                                 leftIcon={<User size={18} color="#9CA3AF" />}
                                 returnKeyType="next"
                                 onSubmitEditing={() => vendorRef.current?.focus()}
+                                className={suggestions.type === 'customer' ? 'mb-0 rounded-b-none' : ''}
                             />
                             {renderSuggestions('customer')}
 
@@ -417,6 +419,7 @@ export default function AddEntry({ route, navigation }: any) {
                                         leftIcon={<ShoppingBag size={18} color="#9CA3AF" />}
                                         returnKeyType="next"
                                         onSubmitEditing={() => pickupRef.current?.focus()}
+                                        className={suggestions.type === 'vendor' ? 'mb-0 rounded-b-none' : ''}
                                     />
                                     {renderSuggestions('vendor')}
                                 </View>
@@ -430,6 +433,7 @@ export default function AddEntry({ route, navigation }: any) {
                                         leftIcon={<Truck size={18} color="#9CA3AF" />}
                                         returnKeyType="next"
                                         onSubmitEditing={() => costPriceRef.current?.focus()}
+                                        className={suggestions.type === 'pickup' ? 'mb-0 rounded-b-none' : ''}
                                     />
                                     {renderSuggestions('pickup')}
                                 </View>
