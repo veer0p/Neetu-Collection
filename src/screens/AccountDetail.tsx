@@ -15,12 +15,15 @@ import { useRoute } from '@react-navigation/native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useResponsive } from '../hooks/useResponsive';
 
 export default function AccountDetail({ navigation }: { navigation: any }) {
     const route = useRoute();
     const { person } = route.params as { person: DirectoryItem };
     const { userId } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
+
 
     const [ledger, setLedger] = useState<LedgerEntry[]>([]);
     const [loading, setLoading] = useState(true);
@@ -186,14 +189,14 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                         <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-wider mb-1">Current Balance</Text>
                         <Text className={cn(
                             "text-4xl font-sans-bold",
-                            fullBalance > 0 ? "text-danger" : fullBalance < 0 ? "text-success" : "text-primary dark:text-primary-dark"
+                            fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-primary dark:text-primary-dark"
                         )}>
                             ₹{Math.abs(fullBalance).toLocaleString()}
                         </Text>
                         <Text className={cn("font-sans-semibold text-xs mt-1",
-                            fullBalance > 0 ? "text-danger" : fullBalance < 0 ? "text-success" : "text-secondary dark:text-secondary-dark"
+                            fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-secondary dark:text-secondary-dark"
                         )}>
-                            {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled"}
+                            {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled ✓"}
                         </Text>
                     </Card>
                 </View>
@@ -235,85 +238,156 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                     <FlatList
                         data={ledger.filter(e => typeFilter === 'All' || e.transactionType === typeFilter)}
                         keyExtractor={item => item.id}
-                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}
-                        renderItem={({ item, index }) => (
-                            <TouchableOpacity
-                                onPress={() => handleEntryPress(item)}
-                                className={cn("flex-row items-center py-4", index > 0 && "border-t border-divider dark:border-divider-dark")}
-                            >
-                                <View className={cn(
-                                    "w-10 h-10 rounded-xl items-center justify-center mr-4",
-                                    item.amount < 0 ? "bg-success/10" : "bg-danger/10"
-                                )}>
-                                    {item.amount < 0 ? <TrendingUp size={20} color="#10B981" /> : <TrendingDown size={20} color="#EF4444" />}
-                                </View>
-                                <View className="flex-1">
-                                    <View className="flex-row items-center justify-between">
-                                        <View className="flex-1 mr-2">
-                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.transactionType}</Text>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5" numberOfLines={1}>{item.notes || 'No notes'}</Text>
-                                        </View>
-                                        <View className="items-end">
-                                            <View className="flex-row items-center gap-2">
-                                                <Text className={cn("font-sans-bold text-base", item.amount < 0 ? "text-success" : "text-danger")}>
-                                                    {item.amount < 0 ? '-' : '+'}₹{Math.abs(item.amount).toLocaleString()}
-                                                </Text>
-                                                {/* Delete button — only for manual (non-order-linked) entries */}
-                                                {!item.orderId ? (
-                                                    <TouchableOpacity
-                                                        onPress={(e) => { e.stopPropagation(); handleDeleteEntry(item); }}
-                                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                                        className="w-7 h-7 rounded-lg bg-danger/10 items-center justify-center"
-                                                    >
-                                                        <Trash2 size={13} color="#EF4444" />
-                                                    </TouchableOpacity>
-                                                ) : (
-                                                    <View className="w-7 h-7 items-center justify-center opacity-30">
-                                                        <Lock size={13} color={isDark ? '#94A3B8' : '#6B7280'} />
-                                                    </View>
-                                                )}
-                                            </View>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] mt-0.5">
-                                                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                            </Text>
-                                        </View>
+                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
+                        renderItem={({ item, index }) => {
+                            const isInflow = item.amount > 0;
+                            const isActionable = ['Sale', 'Purchase', 'Reimbursement', 'Expense'].includes(item.transactionType);
+                            const alreadySettled = isActionable && item.orderId
+                                ? ledger.some(e =>
+                                    e.orderId === item.orderId &&
+                                    (e.transactionType === 'PaymentIn' || e.transactionType === 'PaymentOut')
+                                )
+                                : false;
+                            const isCanceled = item.orderStatus === 'Canceled';
+
+                            return (
+                                <TouchableOpacity
+                                    onPress={() => handleEntryPress(item)}
+                                    activeOpacity={0.6}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center',
+                                        paddingVertical: 14,
+                                        borderTopWidth: index > 0 ? 1 : 0,
+                                        borderTopColor: isDark ? '#1E293B' : '#F1F5F9',
+                                    }}
+                                >
+                                    {/* Left icon */}
+                                    <View style={{
+                                        width: 38, height: 38, borderRadius: 10,
+                                        backgroundColor: isInflow ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
+                                        alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                                    }}>
+                                        {isInflow
+                                            ? <TrendingUp size={18} color="#10B981" />
+                                            : <TrendingDown size={18} color="#EF4444" />
+                                        }
                                     </View>
 
-                                    {/* Quick Actions - only show settle button for unmatched entries */}
-                                    {['Sale', 'Purchase', 'Reimbursement', 'Expense'].includes(item.transactionType) && (
-                                        <View className="flex-row mt-2 items-center gap-2">
-                                            {/* Check if this order-linked entry is already matched by a PaymentIn/Out sibling */}
-                                            {item.orderStatus === 'Canceled' ? (
-                                                <View className="px-2 py-0.5 rounded-lg bg-danger/10">
-                                                    <Text className="text-danger font-sans-bold text-[10px] uppercase">Canceled</Text>
+                                    {/* Center: type + sub-line (product/notes + date + status) */}
+                                    <View style={{ flex: 1 }}>
+                                        {/* Line 1: transaction type */}
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_600SemiBold',
+                                            fontSize: 13,
+                                            color: isDark ? '#F1F5F9' : '#0F172A',
+                                        }} numberOfLines={1}>
+                                            {item.transactionType}
+                                            {item.orderId && item.orderProductName ? (
+                                                <Text style={{
+                                                    fontFamily: 'PlusJakartaSans_400Regular',
+                                                    fontSize: 12,
+                                                    color: isDark ? '#818CF8' : '#4F46E5',
+                                                }}> · {item.orderProductName}</Text>
+                                            ) : null}
+                                        </Text>
+
+                                        {/* Line 2: date + status pill or action button (all inline) */}
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_400Regular',
+                                                fontSize: 11,
+                                                color: isDark ? '#64748B' : '#94A3B8',
+                                            }}>
+                                                {new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                            </Text>
+
+                                            {item.notes && !item.orderId ? (
+                                                <Text style={{
+                                                    fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11,
+                                                    color: isDark ? '#64748B' : '#94A3B8',
+                                                }} numberOfLines={1}>· {item.notes}</Text>
+                                            ) : null}
+
+                                            {/* Status or action — inline */}
+                                            {isActionable && isCanceled && (
+                                                <View style={{
+                                                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                                                    backgroundColor: 'rgba(239,68,68,0.10)',
+                                                }}>
+                                                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#EF4444', letterSpacing: 0.4 }}>
+                                                        CANCELED
+                                                    </Text>
                                                 </View>
-                                            ) : (
+                                            )}
+
+                                            {isActionable && !isCanceled && alreadySettled && (
+                                                <View style={{
+                                                    flexDirection: 'row', alignItems: 'center', gap: 3,
+                                                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                                                    backgroundColor: 'rgba(16,185,129,0.10)',
+                                                }}>
+                                                    <View style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: '#10B981' }} />
+                                                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#10B981', letterSpacing: 0.4 }}>
+                                                        SETTLED
+                                                    </Text>
+                                                </View>
+                                            )}
+
+                                            {isActionable && !isCanceled && !alreadySettled && (
                                                 <TouchableOpacity
-                                                    onPress={(e) => {
-                                                        e.stopPropagation();
-                                                        handleQuickSettle(item);
+                                                    onPress={(e) => { e.stopPropagation(); handleQuickSettle(item); }}
+                                                    activeOpacity={0.75}
+                                                    style={{
+                                                        flexDirection: 'row', alignItems: 'center', gap: 4,
+                                                        paddingHorizontal: 8, paddingVertical: 3,
+                                                        borderRadius: 6, borderWidth: 1,
+                                                        borderColor: isInflow ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)',
+                                                        backgroundColor: isInflow ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
                                                     }}
-                                                    className={cn(
-                                                        "px-3 py-1 rounded-lg flex-row items-center",
-                                                        item.amount > 0 ? "bg-success/20 border border-success/30" : "bg-danger/20 border border-danger/30"
-                                                    )}
-                                                    activeOpacity={0.7}
                                                 >
-                                                    <Text className={cn("font-sans-bold text-[10px] uppercase", item.amount > 0 ? "text-success" : "text-danger")}>
-                                                        {item.amount > 0 ? "Mark Received" : "Mark Paid"}
+                                                    <Text style={{
+                                                        fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, letterSpacing: 0.2,
+                                                        color: isInflow ? '#10B981' : '#F59E0B',
+                                                    }}>
+                                                        {isInflow ? 'Mark Received' : 'Mark Paid'}
                                                     </Text>
                                                 </TouchableOpacity>
                                             )}
-                                            {item.orderId && (
-                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">
-                                                    {item.orderProductName || 'Order linked'}
-                                                </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Right: amount + delete/lock */}
+                                    <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15,
+                                            color: isInflow ? '#10B981' : '#EF4444',
+                                        }}>
+                                            {isInflow ? '+' : '-'}₹{Math.abs(item.amount).toLocaleString()}
+                                        </Text>
+                                        <View style={{ marginTop: 4 }}>
+                                            {!item.orderId ? (
+                                                <TouchableOpacity
+                                                    onPress={(e) => { e.stopPropagation(); handleDeleteEntry(item); }}
+                                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                                    style={{
+                                                        width: 24, height: 24, borderRadius: 6,
+                                                        backgroundColor: 'rgba(239,68,68,0.10)',
+                                                        alignItems: 'center', justifyContent: 'center',
+                                                    }}
+                                                >
+                                                    <Trash2 size={11} color="#EF4444" />
+                                                </TouchableOpacity>
+                                            ) : (
+                                                <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center', opacity: 0.2 }}>
+                                                    <Lock size={11} color={isDark ? '#94A3B8' : '#6B7280'} />
+                                                </View>
                                             )}
                                         </View>
-                                    )}
-                                </View>
-                            </TouchableOpacity>
-                        )}
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        }}
+
                         ListEmptyComponent={
                             <View className="items-center py-20">
                                 <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">No transactions</Text>
@@ -449,7 +523,7 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                 type="danger"
                 loading={deleteEntryLoading}
             />
-        </Background>
+        </Background >
     );
 }
 

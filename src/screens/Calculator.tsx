@@ -1,18 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     X, Minus, Plus, Equal, Delete,
     Divide, Percent, Delete as Backspace
 } from 'lucide-react-native';
-import { MotiView, AnimatePresence } from 'moti';
+import { MotiView } from 'moti';
 import { useTheme } from '../context/ThemeContext';
 import { cn } from '../utils/cn';
+import { useResponsive } from '../hooks/useResponsive';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BUTTON_GAP = 12;
-const PADDING = 24;
-const BUTTON_SIZE = (SCREEN_WIDTH - (PADDING * 2) - (BUTTON_GAP * 3)) / 4;
 
 type ButtonType = 'num' | 'op' | 'special' | 'equal';
 
@@ -21,13 +19,15 @@ const CalcButton = ({
     icon: Icon,
     type = 'num',
     onPress,
-    isDark
+    isDark,
+    size,
 }: {
     label?: string,
     icon?: any,
     type?: ButtonType,
     onPress: () => void,
-    isDark: boolean
+    isDark: boolean,
+    size: number,
 }) => {
 
     const getBgColor = () => {
@@ -49,9 +49,9 @@ const CalcButton = ({
             onPress={onPress}
             activeOpacity={0.7}
             style={{
-                width: BUTTON_SIZE,
-                height: BUTTON_SIZE,
-                borderRadius: BUTTON_SIZE / 2.5,
+                width: size,
+                height: size,
+                borderRadius: size / 2.5,
                 backgroundColor: getBgColor(),
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -74,8 +74,14 @@ const CalcButton = ({
 
 export default function Calculator() {
     const { isDark } = useTheme();
+    const { isWeb, CONTENT_MAX_WIDTH, windowWidth } = useResponsive();
     const [expression, setExpression] = useState('');
     const [result, setResult] = useState('');
+
+    // Compute button size dynamically based on available content width
+    const PADDING = 24;
+    const effectiveWidth = isWeb ? Math.min(windowWidth, CONTENT_MAX_WIDTH) : windowWidth;
+    const BUTTON_SIZE = (effectiveWidth - (PADDING * 2) - (BUTTON_GAP * 3)) / 4;
 
     const handlePress = (val: string) => {
         setExpression(prev => prev + val);
@@ -92,13 +98,10 @@ export default function Calculator() {
 
     const calculate = () => {
         try {
-            // Basic sanitization and evaluation
             const sanitized = expression
                 .replace(/×/g, '*')
                 .replace(/÷/g, '/')
                 .replace(/%/g, '/100');
-
-            // Note: simple eval for now, can use mathjs for more precision
             const evalResult = eval(sanitized);
             setResult(evalResult.toString());
         } catch (e) {
@@ -106,68 +109,74 @@ export default function Calculator() {
         }
     };
 
-    return (
-        <View className="flex-1 bg-surface dark:bg-surface-dark">
-            <SafeAreaView className="flex-1" edges={['top']}>
-                {/* Display Area */}
-                <View className="flex-1 justify-end px-8 pb-8">
-                    <MotiView
-                        from={{ opacity: 0, translateY: 20 }}
-                        animate={{ opacity: 1, translateY: 0 }}
-                        className="items-end"
-                    >
-                        <Text
-                            className="text-secondary dark:text-secondary-dark font-sans-medium text-2xl mb-2"
-                            numberOfLines={2}
-                        >
-                            {expression || '0'}
-                        </Text>
-                        <Text
-                            className="text-primary dark:text-primary-dark font-sans-bold text-5xl"
-                            numberOfLines={1}
-                        >
-                            {result || ' '}
-                        </Text>
-                    </MotiView>
-                </View>
+    const btn = (props: Omit<Parameters<typeof CalcButton>[0], 'isDark' | 'size'>) => (
+        <CalcButton {...props} isDark={isDark} size={BUTTON_SIZE} />
+    );
 
-                {/* Keypad */}
-                <View
-                    className="bg-white dark:bg-slate-900 rounded-t-[40px] px-6 pt-10 pb-32 shadow-2xl border-t border-black/5 dark:border-white/5"
-                    style={{ gap: BUTTON_GAP }}
-                >
-                    <View className="flex-row justify-between">
-                        <CalcButton label="C" type="special" onPress={clear} isDark={isDark} />
-                        <CalcButton icon={Backspace} type="op" onPress={deleteLast} isDark={isDark} />
-                        <CalcButton label="%" type="op" onPress={() => handlePress('%')} isDark={isDark} />
-                        <CalcButton icon={Divide} type="op" onPress={() => handlePress('÷')} isDark={isDark} />
+    return (
+        <View className="flex-1 bg-surface dark:bg-surface-dark items-center">
+            <View style={[{ flex: 1, width: '100%' }, isWeb ? { maxWidth: CONTENT_MAX_WIDTH } : {}]}>
+                <SafeAreaView className="flex-1" edges={['top']}>
+                    {/* Display Area */}
+                    <View className="flex-1 justify-end px-8 pb-8">
+                        <MotiView
+                            from={{ opacity: 0, translateY: 20 }}
+                            animate={{ opacity: 1, translateY: 0 }}
+                            className="items-end"
+                        >
+                            <Text
+                                className="text-secondary dark:text-secondary-dark font-sans-medium text-2xl mb-2"
+                                numberOfLines={2}
+                            >
+                                {expression || '0'}
+                            </Text>
+                            <Text
+                                className="text-primary dark:text-primary-dark font-sans-bold text-5xl"
+                                numberOfLines={1}
+                            >
+                                {result || ' '}
+                            </Text>
+                        </MotiView>
                     </View>
-                    <View className="flex-row justify-between">
-                        <CalcButton label="7" onPress={() => handlePress('7')} isDark={isDark} />
-                        <CalcButton label="8" onPress={() => handlePress('8')} isDark={isDark} />
-                        <CalcButton label="9" onPress={() => handlePress('9')} isDark={isDark} />
-                        <CalcButton icon={X} type="op" onPress={() => handlePress('×')} isDark={isDark} />
+
+                    {/* Keypad */}
+                    <View
+                        className="bg-white dark:bg-slate-900 rounded-t-[40px] px-6 pt-10 pb-12 shadow-2xl border-t border-black/5 dark:border-white/5"
+                        style={{ gap: BUTTON_GAP, paddingBottom: isWeb ? 48 : 128 }}
+                    >
+                        <View className="flex-row justify-between">
+                            {btn({ label: 'C', type: 'special', onPress: clear })}
+                            {btn({ icon: Backspace, type: 'op', onPress: deleteLast })}
+                            {btn({ label: '%', type: 'op', onPress: () => handlePress('%') })}
+                            {btn({ icon: Divide, type: 'op', onPress: () => handlePress('÷') })}
+                        </View>
+                        <View className="flex-row justify-between">
+                            {btn({ label: '7', onPress: () => handlePress('7') })}
+                            {btn({ label: '8', onPress: () => handlePress('8') })}
+                            {btn({ label: '9', onPress: () => handlePress('9') })}
+                            {btn({ icon: X, type: 'op', onPress: () => handlePress('×') })}
+                        </View>
+                        <View className="flex-row justify-between">
+                            {btn({ label: '4', onPress: () => handlePress('4') })}
+                            {btn({ label: '5', onPress: () => handlePress('5') })}
+                            {btn({ label: '6', onPress: () => handlePress('6') })}
+                            {btn({ icon: Minus, type: 'op', onPress: () => handlePress('-') })}
+                        </View>
+                        <View className="flex-row justify-between">
+                            {btn({ label: '1', onPress: () => handlePress('1') })}
+                            {btn({ label: '2', onPress: () => handlePress('2') })}
+                            {btn({ label: '3', onPress: () => handlePress('3') })}
+                            {btn({ icon: Plus, type: 'op', onPress: () => handlePress('+') })}
+                        </View>
+                        <View className="flex-row justify-between">
+                            {btn({ label: '(', onPress: () => handlePress('(') })}
+                            {btn({ label: '0', onPress: () => handlePress('0') })}
+                            {btn({ label: ')', onPress: () => handlePress(')') })}
+                            {btn({ icon: Equal, type: 'equal', onPress: calculate })}
+                        </View>
                     </View>
-                    <View className="flex-row justify-between">
-                        <CalcButton label="4" onPress={() => handlePress('4')} isDark={isDark} />
-                        <CalcButton label="5" onPress={() => handlePress('5')} isDark={isDark} />
-                        <CalcButton label="6" onPress={() => handlePress('6')} isDark={isDark} />
-                        <CalcButton icon={Minus} type="op" onPress={() => handlePress('-')} isDark={isDark} />
-                    </View>
-                    <View className="flex-row justify-between">
-                        <CalcButton label="1" onPress={() => handlePress('1')} isDark={isDark} />
-                        <CalcButton label="2" onPress={() => handlePress('2')} isDark={isDark} />
-                        <CalcButton label="3" onPress={() => handlePress('3')} isDark={isDark} />
-                        <CalcButton icon={Plus} type="op" onPress={() => handlePress('+')} isDark={isDark} />
-                    </View>
-                    <View className="flex-row justify-between">
-                        <CalcButton label="(" onPress={() => handlePress('(')} isDark={isDark} />
-                        <CalcButton label="0" onPress={() => handlePress('0')} isDark={isDark} />
-                        <CalcButton label=")" onPress={() => handlePress(')')} isDark={isDark} />
-                        <CalcButton icon={Equal} type="equal" onPress={calculate} isDark={isDark} />
-                    </View>
-                </View>
-            </SafeAreaView>
+                </SafeAreaView>
+            </View>
         </View>
     );
 }

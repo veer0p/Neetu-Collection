@@ -6,16 +6,18 @@ import { Background } from '../components/Background';
 import { Card } from '../components/Card';
 import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
-import { Search, ChevronRight } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useResponsive } from '../hooks/useResponsive';
 
 type FilterTab = 'all' | 'customers' | 'vendors' | 'pickup';
 
 export default function Ledger({ navigation }: { navigation: any }) {
     const { userId } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
     const [accounts, setAccounts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -84,48 +86,76 @@ export default function Ledger({ navigation }: { navigation: any }) {
         { id: 'pickup', label: 'Pickup' },
     ];
 
-    const renderPerson = (item: any, isPayable: boolean) => (
-        <TouchableOpacity
-            key={item.id}
-            onPress={() => (navigation as any).navigate('AccountDetail', { person: item })}
-            className="flex-row items-center justify-between py-4 border-b border-divider dark:border-divider-dark"
-        >
-            <View className="flex-1">
-                <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.name}</Text>
-                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5">{item.type}</Text>
-            </View>
-            <View className="flex-row items-center gap-3">
-                <View className="items-end">
-                    <Text className={cn(
-                        "font-sans-bold text-base",
-                        isPayable ? "text-danger" : "text-success"
-                    )}>
-                        ₹{Math.abs(item.balance || 0).toLocaleString()}
-                    </Text>
+    const renderPerson = (item: any, isPayable: boolean) => {
+        const initials = item.name.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+        const bgColor = isPayable ? 'rgba(239,68,68,0.10)' : 'rgba(16,185,129,0.10)';
+        const textColor = isPayable ? '#EF4444' : '#10B981';
+        const btnBg = isPayable ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)';
+        const btnBorder = isPayable ? 'rgba(239,68,68,0.30)' : 'rgba(16,185,129,0.30)';
+
+        return (
+            <TouchableOpacity
+                key={item.id}
+                onPress={() => (navigation as any).navigate('AccountDetail', { person: item })}
+                activeOpacity={0.65}
+                className="mb-3"
+            >
+                <View className="bg-surface dark:bg-surface-dark rounded-2xl p-4 border border-divider dark:border-divider-dark">
+                    <View className="flex-row items-center">
+                        {/* Avatar */}
+                        <View style={{
+                            width: 42, height: 42, borderRadius: 12,
+                            backgroundColor: bgColor,
+                            alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                        }}>
+                            <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: textColor }}>
+                                {initials}
+                            </Text>
+                        </View>
+
+                        {/* Name + type */}
+                        <View className="flex-1">
+                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm" numberOfLines={1}>{item.name}</Text>
+                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5">{item.type}</Text>
+                        </View>
+
+                        {/* Balance */}
+                        <View className="items-end">
+                            <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, color: textColor }}>
+                                ₹{Math.abs(item.balance || 0).toLocaleString()}
+                            </Text>
+                            <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: isPayable ? '#EF4444' : '#10B981', marginTop: 1 }}>
+                                {isPayable ? 'You owe' : 'You are owed'}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Action button */}
                     {item.balance !== 0 && (
                         <TouchableOpacity
-                            onPress={(e) => {
-                                e.stopPropagation();
-                                handleQuickSettle(item);
+                            onPress={(e) => { e.stopPropagation(); handleQuickSettle(item); }}
+                            activeOpacity={0.75}
+                            style={{
+                                marginTop: 12, paddingVertical: 10,
+                                borderRadius: 12, borderWidth: 1,
+                                borderColor: btnBorder,
+                                backgroundColor: btnBg,
+                                alignItems: 'center',
                             }}
-                            className={cn(
-                                "mt-1 px-2 py-0.5 rounded-md",
-                                isPayable ? "bg-danger/10" : "bg-success/10"
-                            )}
                         >
-                            <Text className={cn(
-                                "font-sans-bold text-[9px] uppercase",
-                                isPayable ? "text-danger" : "text-success"
-                            )}>
-                                {isPayable ? "Paid?" : "Recv?"}
+                            <Text style={{
+                                fontFamily: 'PlusJakartaSans_700Bold',
+                                fontSize: 12, letterSpacing: 0.3,
+                                color: textColor,
+                            }}>
+                                {isPayable ? '✓  Mark as Paid' : '✓  Mark as Received'}
                             </Text>
                         </TouchableOpacity>
                     )}
                 </View>
-                <ChevronRight size={16} color="#9CA3AF" />
-            </View>
-        </TouchableOpacity>
-    );
+            </TouchableOpacity>
+        );
+    };
 
     const sections = [
         ...(toCollect.length > 0 ? [{
@@ -200,7 +230,7 @@ export default function Ledger({ navigation }: { navigation: any }) {
                     <FlatList
                         data={sections}
                         keyExtractor={s => s.key}
-                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}
+                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
                         renderItem={({ item: section }) => (
                             <View className="mb-6">
                                 <View className="flex-row justify-between items-center mb-2">
@@ -209,9 +239,9 @@ export default function Ledger({ navigation }: { navigation: any }) {
                                         <Text className={cn("font-sans-bold text-sm", section.color)}>{section.total}</Text>
                                     ) : null}
                                 </View>
-                                <Card className="px-4 py-0">
+                                <View>
                                     {section.data.map(item => renderPerson(item, section.isPayable))}
-                                </Card>
+                                </View>
                             </View>
                         )}
                         ListEmptyComponent={

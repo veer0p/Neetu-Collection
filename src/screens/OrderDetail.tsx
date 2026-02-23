@@ -10,6 +10,7 @@ import { ChevronLeft, Trash2, Edit3, ArrowUpRight, ArrowDownLeft } from 'lucide-
 import { cn } from '../utils/cn';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useTheme } from '../context/ThemeContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 const InfoRow = ({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) => (
     <View className="flex-row items-center justify-between py-3 border-b border-divider dark:border-divider-dark">
@@ -31,32 +32,13 @@ export default function OrderDetail({ route, navigation }: any) {
     const orderId = route.params?.orderId || order?.id;
     const { deleteOrder } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
+
     const [ledgerEntries, setLedgerEntries] = useState<(LedgerEntry & { personName?: string })[]>([]);
     const [loading, setLoading] = useState(true);
     const [deleteVisible, setDeleteVisible] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [updatingPayment, setUpdatingPayment] = useState<string | null>(null);
 
-    const handlePaymentToggle = async (field: 'customer' | 'vendor' | 'pickup', current: string) => {
-        if (!order?.id || updatingPayment) return;
-        const newStatus = current === 'Paid' ? 'Udhar' : 'Paid';
-        setUpdatingPayment(field);
-        try {
-            await supabaseService.updateOrderPaymentStatus(order.id, field, newStatus);
-            // Update local state immediately for a snappy feel
-            setOrder((prev: any) => ({
-                ...prev,
-                customerPaymentStatus: field === 'customer' ? newStatus : prev.customerPaymentStatus,
-                vendorPaymentStatus: field === 'vendor' ? newStatus : prev.vendorPaymentStatus,
-                pickupPaymentStatus: field === 'pickup' ? newStatus : prev.pickupPaymentStatus,
-            }));
-            await loadData();
-        } catch (e) {
-            console.error('Payment toggle failed:', e);
-        } finally {
-            setUpdatingPayment(null);
-        }
-    };
 
     useEffect(() => {
         if (orderId) {
@@ -112,7 +94,7 @@ export default function OrderDetail({ route, navigation }: any) {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}>
                     {/* Header */}
                     <View className="flex-row items-center px-6 pt-4 pb-2">
                         <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
@@ -151,42 +133,41 @@ export default function OrderDetail({ route, navigation }: any) {
                             </Text>
                         </Card>
 
-                        {/* Payment Status - Interactive Toggles */}
+                        {/* Payment Status — Read Only */}
                         <View className="mb-4">
                             <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-2 ml-1">Payment Status</Text>
                             <Card className="p-4">
                                 {[
-                                    { key: 'customer' as const, label: 'Customer', status: order.customerPaymentStatus },
-                                    { key: 'vendor' as const, label: 'Vendor', status: order.vendorPaymentStatus },
-                                    ...(order.pickupPersonName ? [{ key: 'pickup' as const, label: 'Pickup', status: order.pickupPaymentStatus || 'Paid' }] : []),
+                                    { label: 'Customer', status: order.customerPaymentStatus },
+                                    { label: 'Vendor', status: order.vendorPaymentStatus },
+                                    ...(order.pickupPersonName ? [{ label: 'Pickup', status: order.pickupPaymentStatus || 'Udhar' }] : []),
                                 ].map((item, idx, arr) => (
-                                    <View key={item.key} className={cn("flex-row items-center justify-between py-3", idx < arr.length - 1 && "border-b border-divider dark:border-divider-dark")}>
+                                    <View key={item.label} className={cn("flex-row items-center justify-between py-3", idx < arr.length - 1 && "border-b border-divider dark:border-divider-dark")}>
                                         <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">{item.label}</Text>
-                                        <TouchableOpacity
-                                            onPress={() => handlePaymentToggle(item.key, item.status)}
-                                            disabled={!!updatingPayment}
-                                            className={cn(
-                                                "flex-row items-center px-4 py-1.5 rounded-full",
-                                                item.status === 'Paid'
-                                                    ? "bg-success/15 border border-success/30"
-                                                    : "bg-warning/15 border border-warning/30"
-                                            )}
-                                        >
-                                            {updatingPayment === item.key ? (
-                                                <ActivityIndicator size={12} color={item.status === 'Paid' ? '#10B981' : '#F59E0B'} />
-                                            ) : (
-                                                <>
-                                                    <View className={cn("w-2 h-2 rounded-full mr-2", item.status === 'Paid' ? 'bg-success' : 'bg-warning')} />
-                                                    <Text className={cn("font-sans-bold text-xs", item.status === 'Paid' ? 'text-success' : 'text-warning')}>
-                                                        {item.status || 'Udhar'}
-                                                    </Text>
-                                                </>
-                                            )}
-                                        </TouchableOpacity>
+                                        <View style={{
+                                            flexDirection: 'row', alignItems: 'center', gap: 6,
+                                            paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99,
+                                            backgroundColor: item.status === 'Paid' ? 'rgba(16,185,129,0.10)' : 'rgba(245,158,11,0.10)',
+                                            borderWidth: 1,
+                                            borderColor: item.status === 'Paid' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)',
+                                        }}>
+                                            <View style={{
+                                                width: 6, height: 6, borderRadius: 99,
+                                                backgroundColor: item.status === 'Paid' ? '#10B981' : '#F59E0B',
+                                            }} />
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_600SemiBold',
+                                                fontSize: 12,
+                                                color: item.status === 'Paid' ? '#10B981' : '#F59E0B',
+                                            }}>
+                                                {item.status || 'Udhar'}
+                                            </Text>
+                                        </View>
                                     </View>
                                 ))}
                             </Card>
                         </View>
+
 
                         {/* Details */}
                         <Card className="p-4 mb-4">
@@ -264,15 +245,15 @@ export default function OrderDetail({ route, navigation }: any) {
                                 ledgerEntries.map((entry, idx) => (
                                     <View key={entry.id} className={cn("flex-row items-center py-4 bg-surface dark:bg-surface-dark px-4 rounded-2xl mb-2 border border-divider dark:border-divider-dark")}>
                                         <View className={cn("w-8 h-8 rounded-full items-center justify-center mr-3",
-                                            entry.amount > 0 ? "bg-danger/10" : "bg-success/10"
+                                            entry.amount > 0 ? "bg-success/10" : "bg-danger/10"
                                         )}>
-                                            {entry.amount > 0 ? <ArrowUpRight size={16} color="#EF4444" /> : <ArrowDownLeft size={16} color="#10B981" />}
+                                            {entry.amount > 0 ? <ArrowDownLeft size={16} color="#10B981" /> : <ArrowUpRight size={16} color="#EF4444" />}
                                         </View>
                                         <View className="flex-1">
                                             <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">{entry.transactionType}</Text>
                                             <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{entry.personName || 'Account'}</Text>
                                         </View>
-                                        <Text className={cn("font-sans-bold text-sm", entry.amount > 0 ? "text-danger" : "text-success")}>
+                                        <Text className={cn("font-sans-bold text-sm", entry.amount > 0 ? "text-success" : "text-danger")}>
                                             {entry.amount > 0 ? '+' : '-'}₹{Math.abs(entry.amount).toLocaleString()}
                                         </Text>
                                     </View>

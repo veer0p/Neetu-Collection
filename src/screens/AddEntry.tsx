@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, ScrollView, KeyboardAvoidingView, Platform, TouchableOpacity, ActivityIndicator, TextInput, Pressable, Alert, Keyboard } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
@@ -65,7 +66,18 @@ export default function AddEntry({ route, navigation }: any) {
     const trackingRef = useRef<TextInput>(null);
     const notesRef = useRef<TextInput>(null);
 
-    const [form, setForm] = useState({
+    const emptyForm = {
+        productName: '', vendorName: '', customerName: '', pickupPersonName: '',
+        productId: '', customerId: '', vendorId: '', pickupPersonId: '',
+        originalPrice: '', sellingPrice: '', shippingCharges: '', pickupCharges: '',
+        status: 'Booked' as OrderStatus, trackingId: '', courierName: '', notes: '',
+        customerPaymentStatus: 'Udhar' as 'Paid' | 'Udhar',
+        vendorPaymentStatus: 'Udhar' as string,
+        pickupPaymentStatus: 'Udhar' as 'Paid' | 'Udhar',
+        date: new Date().toLocaleDateString('en-GB'),
+    };
+
+    const [form, setForm] = useState(editingOrder ? {
         productName: editingOrder?.productName || '',
         vendorName: editingOrder?.vendorName || '',
         customerName: editingOrder?.customerName || '',
@@ -87,12 +99,20 @@ export default function AddEntry({ route, navigation }: any) {
         vendorPaymentStatus: editingOrder?.paidByDriver ? 'DriverPaid' : ((editingOrder?.vendorPaymentStatus as 'Paid' | 'Udhar') || 'Udhar'),
         pickupPaymentStatus: (editingOrder?.pickupPaymentStatus as 'Paid' | 'Udhar') || 'Udhar',
         date: editingOrder?.date || new Date().toLocaleDateString('en-GB') // DD/MM/YYYY
-    });
+    } : emptyForm);
 
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [statusPickerVisible, setStatusPickerVisible] = useState(false);
     const [successDialogVisible, setSuccessDialogVisible] = useState(false);
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+    // Reset form to blank whenever screen is focused (new order, not edit)
+    useFocusEffect(useCallback(() => {
+        if (!editingOrder) {
+            setForm({ ...emptyForm, date: new Date().toLocaleDateString('en-GB') });
+            setSuggestions({ type: '', data: [] });
+        }
+    }, [editingOrder]));
 
     useEffect(() => {
         const showSubscription = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));

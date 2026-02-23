@@ -10,12 +10,14 @@ import { cn } from '../utils/cn';
 import { supabaseService } from '../store/supabaseService';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useTransactions } from '../hooks/useTransactions';
+import { useResponsive } from '../hooks/useResponsive';
 
 
 export default function Settings({ user, onLogout, navigation }: { user?: any; onLogout?: () => void; navigation: any }) {
     const { isEnabled, toggleBiometrics } = useBiometrics();
     const { theme, toggleTheme, isDark } = useTheme();
     const { refresh } = useTransactions();
+    const { isWeb } = useResponsive();
     const [seeding, setSeeding] = React.useState(false);
     const [seedConfirmVisible, setSeedConfirmVisible] = React.useState(false);
 

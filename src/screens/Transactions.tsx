@@ -9,6 +9,7 @@ import { useTransactions } from '../hooks/useTransactions';
 import { Search, ChevronRight, ChevronDown } from 'lucide-react-native';
 import { BottomSheetPicker, PickerOption } from '../components/BottomSheetPicker';
 import { useTheme } from '../context/ThemeContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 type StatusFilter = 'All' | 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
 
@@ -41,6 +42,7 @@ const getDateLabel = (dateStr: string): string => {
 export default function Transactions({ navigation }: { navigation: any }) {
     const { orders, loading, refresh, updateOrderStatus } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
     const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -180,7 +182,7 @@ export default function Transactions({ navigation }: { navigation: any }) {
                 <FlatList
                     data={grouped}
                     keyExtractor={item => item.label}
-                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}
+                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
                     onRefresh={refresh}
                     refreshing={loading}
                     renderItem={({ item: group }) => (

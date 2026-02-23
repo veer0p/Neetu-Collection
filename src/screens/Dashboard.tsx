@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
@@ -12,13 +12,12 @@ import {
 } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
-import { LinearGradient } from 'expo-linear-gradient';
-
-const { width } = Dimensions.get('window');
+import { useResponsive } from '../hooks/useResponsive';
 
 export default function Dashboard({ onLogout, user, navigation }: { onLogout: () => void; user: any; navigation: any }) {
     const { userId } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
     const [stats, setStats] = useState({
         netPosition: 0,
         receivable: 0,
@@ -157,7 +156,7 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? '#818CF8' : '#4F46E5'} />}
-                    contentContainerStyle={{ paddingBottom: 100 }}
+                    contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}
                 >
                     {/* Header */}
                     <View className="px-6 pt-4 pb-2">

@@ -8,12 +8,14 @@ import { supabaseService } from '../store/supabaseService';
 import { BarChart3, Users, Store, ChevronLeft, TrendingUp, ShoppingBag } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 type Tab = 'products' | 'customers' | 'vendors' | 'trends';
 
 export default function Reports({ navigation }: { navigation: any }) {
     const { orders: transactions, loading: transLoading, refresh, userId } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
     const [activeTab, setActiveTab] = useState<Tab>('products');
     const [loading, setLoading] = useState(true);
     const [productAnalysis, setProductAnalysis] = useState<any[]>([]);
@@ -203,7 +205,7 @@ export default function Reports({ navigation }: { navigation: any }) {
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 {renderHeader()}
-                <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+                <ScrollView contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}>
                     {loading ? (
                         <View className="py-20 items-center">
                             <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" />

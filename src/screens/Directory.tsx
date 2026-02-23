@@ -11,6 +11,7 @@ import { useTransactions } from '../hooks/useTransactions';
 import { cn } from '../utils/cn';
 import { DirectoryItem } from '../utils/types';
 import { useTheme } from '../context/ThemeContext';
+import { useResponsive } from '../hooks/useResponsive';
 
 type DirectoryType = 'Customer' | 'Vendor' | 'Product' | 'Pickup Person';
 
@@ -26,6 +27,7 @@ const getAddresses = (address: string | undefined): string[] => {
 export default function Directory() {
     const { userId } = useTransactions();
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
     const [activeTab, setActiveTab] = useState<DirectoryType>('Customer');
     const [items, setItems] = useState<DirectoryItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -266,9 +268,12 @@ export default function Directory() {
                 </ScrollView>
 
                 {/* Edit/Add Modal */}
-                <Modal visible={modalVisible} transparent animationType="slide">
-                    <View className="flex-1 justify-end bg-black/50">
-                        <Card className="rounded-t-3xl p-6 pb-10">
+                <Modal visible={modalVisible} transparent animationType={isWeb ? 'fade' : 'slide'}>
+                    <View style={isWeb
+                        ? { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 }
+                        : {}
+                    } className={isWeb ? '' : 'flex-1 justify-end bg-black/50'}>
+                        <Card style={isWeb ? { width: '100%', maxWidth: 480, borderRadius: 24, padding: 24 } : {}} className={isWeb ? '' : 'rounded-t-3xl p-6 pb-10'}>
                             <View className="flex-row justify-between items-center mb-6">
                                 <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">
                                     {editingItem ? 'Edit' : 'Add'} {activeTab}

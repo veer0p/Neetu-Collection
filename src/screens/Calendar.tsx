@@ -8,9 +8,11 @@ import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, ClipboardList, Wallet } from 'lucide-react-native';
 import { cn } from '../utils/cn';
+import { useResponsive } from '../hooks/useResponsive';
 
 export default function Calendar({ navigation }: any) {
     const { isDark } = useTheme();
+    const { isWeb } = useResponsive();
     const { userId } = useTransactions();
     const [viewDate, setViewDate] = useState(new Date());
     const [events, setEvents] = useState<{ [key: string]: { hasOrder: boolean; hasPayment: boolean; items: any[]; statuses: string[] } }>({});
@@ -196,7 +198,7 @@ export default function Calendar({ navigation }: any) {
                     </View>
 
                     {/* Selected Day Legend / Detail */}
-                    <View className="mt-6 mb-10">
+                    <View className="mt-6" style={{ marginBottom: isWeb ? 40 : 100 }}>
                         {selectedDate ? (
                             <View>
                                 <View className="flex-row justify-between items-center mb-4 ml-1">
