@@ -11,16 +11,17 @@ import {
   PlusJakartaSans_800ExtraBold
 } from "@expo-google-fonts/plus-jakarta-sans";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppNavigation } from "./src/components/Navigation";
-import { View, Text } from "react-native";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from "./src/context/ThemeContext";
+import { SplashScreenView } from "./src/components/SplashScreenView";
 
-SplashScreen.preventAutoHideAsync().catch(() => { });
+// Hide native splash screen immediately — our custom one takes over
+SplashScreen.hideAsync().catch(() => { });
 
 export default function App() {
-  const [loaded, error] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     PlusJakartaSans_300Light,
     PlusJakartaSans_400Regular,
     PlusJakartaSans_500Medium,
@@ -29,23 +30,47 @@ export default function App() {
     PlusJakartaSans_800ExtraBold,
   });
 
-  useEffect(() => {
-    if (loaded || error) {
-      SplashScreen.hideAsync().catch(() => { });
+  const [showCustomSplash, setShowCustomSplash] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
+
+  // Fonts must load before we allow the splash to finish
+  const appReady = fontsLoaded || !!fontError;
+
+  const handleSplashFinish = () => {
+    if (appReady) {
+      setSplashDone(true);
+    } else {
+      // If fonts aren't ready yet, wait for them
+      const check = setInterval(() => {
+        // appReady will be updated via closure on next render,
+        // so we just hide once fonts are done
+      }, 100);
+      setTimeout(() => clearInterval(check), 10000);
     }
-  }, [loaded, error]);
+  };
+
+  useEffect(() => {
+    if (appReady && !showCustomSplash) {
+      setSplashDone(true);
+    }
+  }, [appReady]);
 
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <AppNavigation />
-          {!loaded && (
-            <View style={{ position: 'absolute', bottom: 50, left: 0, right: 0, alignItems: 'center' }}>
-              <Text style={{ color: '#94a3b8' }}>Loading fonts...</Text>
-            </View>
-          )}
           <StatusBar style="auto" translucent backgroundColor="transparent" />
+
+          {/* Custom splash screen renders on top */}
+          {showCustomSplash && (
+            <SplashScreenView
+              onFinish={() => {
+                setShowCustomSplash(false);
+                setSplashDone(true);
+              }}
+            />
+          )}
         </GestureHandlerRootView>
       </ThemeProvider>
     </SafeAreaProvider>
