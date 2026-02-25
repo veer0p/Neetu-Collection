@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Neetu Collection",
-    "slug": "neetu-collection",
+    "slug": "accounts",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
@@ -37,7 +37,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "cbbb6d58-f4ed-4098-865a-cda89de66c28"
+        "projectId": "1499d2a5-e7d0-4c92-8c79-47541ceb3f45"
       }
     },
     "owner": "veer.0p"

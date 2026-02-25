@@ -6,25 +6,27 @@ export interface StatusHistoryEntry {
 export interface Transaction {
     id: string;
     date: string;
-    customerName: string;
-    vendorName: string; // Formerly shopName
-    productName: string;
-    originalPrice: number; // Purchase price
-    sellingPrice: number; // Sale price
-    margin: number;
-    marginPercentage: number;
-    vendorPaymentStatus: 'Paid' | 'Udhar'; // Your payment to vendor
-    customerPaymentStatus: 'Paid' | 'Udhar'; // Customer's payment to you
-    pickupPaymentStatus?: 'Paid' | 'Udhar'; // Your payment to pickup person
+    type: 'Sale' | 'Purchase' | 'Payment' | 'Reimbursement' | 'Expense';
+    customerName?: string;
+    vendorName?: string;
+    productName?: string;
+    originalPrice?: number;
+    sellingPrice?: number;
+    margin?: number;
+    marginPercentage?: number;
+    vendorPaymentStatus?: 'Paid' | 'Udhar';
+    customerPaymentStatus?: 'Paid' | 'Udhar';
+    pickupPaymentStatus?: 'Paid' | 'Udhar';
     pickupPersonName?: string;
     trackingId?: string;
     courierName?: string;
     pickupCharges?: number;
     shippingCharges?: number;
-    status: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
+    status?: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
     notes?: string;
     statusHistory?: StatusHistoryEntry[];
     createdAt: number;
+    amount?: number; // For Payment/Expense types
 }
 export type OrderStatus = 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
 

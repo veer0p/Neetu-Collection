@@ -492,23 +492,80 @@ export const supabaseService = {
     },
 
     async getTransactions(userId: string): Promise<Transaction[]> {
-        const { data: orders, error } = await supabase
-            .from('orders').select('*, customer:directory!customer_id(name), product:directory!product_id(name), vendor:directory!vendor_id(name), pickup_person:directory!pickup_person_id(name)')
-            .eq('user_id', userId).order('date', { ascending: false });
-        if (error) return [];
-        return (orders || []).map((o: any) => {
+        // 1. Fetch Orders
+        const { data: orders, error: ordersError } = await supabase
+            .from('orders')
+            .select('*, customer:directory!customer_id(name), product:directory!product_id(name), vendor:directory!vendor_id(name), pickup_person:directory!pickup_person_id(name)')
+            .eq('user_id', userId);
+
+        // 2. Fetch Ledger (Payments/Expenses)
+        const { data: ledger, error: ledgerError } = await supabase
+            .from('ledger')
+            .select('*, person:directory!person_id(name)')
+            .eq('user_id', userId)
+            .is('order_id', null); // Only fetch manual entries to avoid duplicates with order-linked ledger
+
+        if (ordersError) {
+            console.error('Error fetching orders for transactions:', ordersError);
+        }
+        if (ledgerError) {
+            console.error('Error fetching ledger for transactions:', ledgerError);
+        }
+
+        const normalizedOrders: Transaction[] = (orders || []).map((o: any) => {
             const { margin, percentage } = calculateMargin(Number(o.original_price), Number(o.selling_price), Number(o.pickup_charges), Number(o.shipping_charges));
             return {
-                id: o.id, date: o.date, customerName: o.customer?.name || 'Unknown', vendorName: o.vendor?.name || 'Unknown', productName: o.product?.name || 'Unknown',
-                originalPrice: Number(o.original_price), sellingPrice: Number(o.selling_price),
-                margin, marginPercentage: percentage, vendorPaymentStatus: o.vendor_payment_status, customerPaymentStatus: o.customer_payment_status,
-                pickupPaymentStatus: o.pickup_payment_status, pickupPersonName: o.pickup_person?.name,
-                trackingId: o.tracking_id, courierName: o.courier_name, pickupCharges: Number(o.pickup_charges), shippingCharges: Number(o.shipping_charges),
-                status: o.status, notes: o.notes,
+                id: o.id,
+                date: o.date,
+                type: 'Sale', // Default as Sale for order listing
+                customerName: o.customer?.name || 'Unknown',
+                vendorName: o.vendor?.name || 'Unknown',
+                productName: o.product?.name || 'Unknown',
+                originalPrice: Number(o.original_price),
+                sellingPrice: Number(o.selling_price),
+                margin,
+                marginPercentage: percentage,
+                vendorPaymentStatus: o.vendor_payment_status,
+                customerPaymentStatus: o.customer_payment_status,
+                pickupPaymentStatus: o.pickup_payment_status,
+                pickupPersonName: o.pickup_person?.name,
+                trackingId: o.tracking_id,
+                courierName: o.courier_name,
+                pickupCharges: Number(o.pickup_charges),
+                shippingCharges: Number(o.shipping_charges),
+                status: o.status,
+                notes: o.notes,
                 statusHistory: o.status_history,
                 createdAt: new Date(o.created_at).getTime(),
             };
-        }) as Transaction[];
+        });
+
+        const normalizedLedger: Transaction[] = (ledger || []).map((l: any) => {
+            // Map transaction_type to Transaction type
+            let type: Transaction['type'] = 'Expense';
+            if (l.transaction_type === 'PaymentIn' || l.transaction_type === 'PaymentOut') {
+                type = 'Payment';
+            } else if (l.transaction_type === 'Sale') {
+                type = 'Sale';
+            } else if (l.transaction_type === 'Purchase') {
+                type = 'Purchase';
+            }
+
+            return {
+                id: l.id,
+                date: l.created_at.split('T')[0], // Use creation date for ledger entries
+                type,
+                customerName: type === 'Payment' && l.amount > 0 ? l.person?.name : undefined,
+                vendorName: type === 'Payment' && l.amount < 0 ? l.person?.name : undefined,
+                productName: l.notes || 'Manual Entry',
+                amount: Math.abs(Number(l.amount)),
+                notes: l.notes,
+                createdAt: new Date(l.created_at).getTime(),
+            };
+        });
+
+        // Combine and sort by createdAt descending
+        return [...normalizedOrders, ...normalizedLedger].sort((a, b) => b.createdAt - a.createdAt);
     },
 
     async getDirectory(userId: string): Promise<DirectoryItem[]> {

@@ -63,7 +63,7 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
             lastWeekStart.setDate(lastWeekStart.getDate() - 7);
             const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-            const activeTransactions = transactions.filter((t: any) => t.status !== 'Canceled');
+            const activeTransactions = transactions.filter((t: any) => t.type === 'Sale' && t.status !== 'Canceled');
 
             const thisWeekOrders = activeTransactions.filter((t: any) => {
                 const d = parseDate(t.date);
