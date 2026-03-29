@@ -35,11 +35,11 @@
     "plugins": [
       "expo-asset"
     ],
+    "owner": "veer.0p",
     "extra": {
       "eas": {
-        "projectId": "1499d2a5-e7d0-4c92-8c79-47541ceb3f45"
+        "projectId": "9aa7b0d0-6c68-48f4-8cb9-d61ea2113870"
       }
-    },
-    "owner": "veer.0p"
+    }
   }
 }
