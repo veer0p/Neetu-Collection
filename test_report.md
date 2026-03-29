@@ -1,7 +1,7 @@
 # Neetu Collection — API Test Report
 
-**Date:** 2026-02-22T16:16:57.767Z  
-**Total:** 26 | **Passed:** 26 | **Failed:** 0 | **Duration:** 47199ms
+**Date:** 2026-03-29T03:57:21.039Z  
+**Total:** 26 | **Passed:** 26 | **Failed:** 0 | **Duration:** 9676ms
 
 ## Overall: ✅ ALL PASSED
 
@@ -9,62 +9,62 @@
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| AUTH-01 | Sign up new user | ✅ Pass | 512ms | — |
-| AUTH-02 | Sign in with valid credentials | ✅ Pass | 805ms | — |
-| AUTH-03 | Sign in with wrong PIN (should fail) | ✅ Pass | 1237ms | — |
+| AUTH-01 | Sign up new user | ✅ Pass | 263ms | — |
+| AUTH-02 | Sign in with valid credentials | ✅ Pass | 157ms | — |
+| AUTH-03 | Sign in with wrong PIN (should fail) | ✅ Pass | 180ms | — |
 
 ### ✅ Directory
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| DIR-01 | Create Product, Customer, Vendor, Pickup Person | ✅ Pass | 12582ms | — |
-| DIR-02 | Fetch directory by user contains test items | ✅ Pass | 2284ms | — |
-| DIR-03 | Fetch contacts by type filter | ✅ Pass | 737ms | — |
-| DIR-04 | Update directory item name | ✅ Pass | 1975ms | — |
-| DIR-05 | Initial balances are all zero | ✅ Pass | 146ms | — |
+| DIR-01 | Create Product, Customer, Vendor, Pickup Person | ✅ Pass | 171ms | — |
+| DIR-02 | Fetch directory by user contains test items | ✅ Pass | 163ms | — |
+| DIR-03 | Fetch contacts by type filter | ✅ Pass | 177ms | — |
+| DIR-04 | Update directory item name | ✅ Pass | 498ms | — |
+| DIR-05 | Initial balances are all zero | ✅ Pass | 198ms | — |
 
 ### ✅ Orders
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| ORD-01 | Create basic order → 2 ledger entries (Sale + Purchase) | ✅ Pass | 559ms | — |
-| ORD-02 | Margin calculation = SP - OP = 500 | ✅ Pass | 611ms | — |
-| ORD-03 | Customer balance = +1500 (receivable) | ✅ Pass | 209ms | — |
-| ORD-04 | Vendor balance = -1000 (payable) | ✅ Pass | 185ms | — |
-| ORD-05 | Canceled order → no ledger entries | ✅ Pass | 689ms | — |
+| ORD-01 | Create basic order → 2 ledger entries (Sale + Purchase) | ✅ Pass | 599ms | — |
+| ORD-02 | Margin calculation = SP - OP = 500 | ✅ Pass | 152ms | — |
+| ORD-03 | Customer balance = +1500 (receivable) | ✅ Pass | 211ms | — |
+| ORD-04 | Vendor balance = -1000 (payable) | ✅ Pass | 149ms | — |
+| ORD-05 | Canceled order → no ledger entries | ✅ Pass | 326ms | — |
 
 ### ✅ Pickup
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| PICK-01 | Update order to add pickup person + charges → ledger regenerated | ✅ Pass | 1591ms | — |
-| PICK-02 | Expense charges assigned to pickup person | ✅ Pass | 155ms | — |
-| PICK-03 | Toggle paid_by_driver → Vendor PaymentOut + Pickup Reimbursement | ✅ Pass | 649ms | — |
-| PICK-04 | After driver-paid, vendor balance = 0 (settled) | ✅ Pass | 127ms | — |
+| PICK-01 | Update order to add pickup person + charges → ledger regenerated | ✅ Pass | 656ms | — |
+| PICK-02 | Expense charges assigned to pickup person | ✅ Pass | 150ms | — |
+| PICK-03 | Toggle paid_by_driver → Vendor PaymentOut + Pickup Reimbursement | ✅ Pass | 642ms | — |
+| PICK-04 | After driver-paid, vendor balance = 0 (settled) | ✅ Pass | 149ms | — |
 
 ### ✅ Payments
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| PAY-01 | Customer pays → balance = 0 | ✅ Pass | 665ms | — |
-| PAY-02 | Vendor paid (non-driver order) → balance settles | ✅ Pass | 473ms | — |
-| PAY-03 | Pickup settled → pickup balance includes all payouts | ✅ Pass | 605ms | — |
-| PAY-04 | Manual addPayment entry recorded | ✅ Pass | 497ms | — |
+| PAY-01 | Customer pays → balance = 0 | ✅ Pass | 690ms | — |
+| PAY-02 | Vendor paid (non-driver order) → balance settles | ✅ Pass | 512ms | — |
+| PAY-03 | Pickup settled → pickup balance includes all payouts | ✅ Pass | 690ms | — |
+| PAY-04 | Manual addPayment entry recorded | ✅ Pass | 471ms | — |
 
 ### ✅ Lifecycle
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| LIFE-01 | Update status to Booked then Shipped → 3 history entries | ✅ Pass | 919ms | — |
-| LIFE-02 | Get order by ID returns correct data | ✅ Pass | 160ms | — |
-| LIFE-03 | Delete order → order + ledger cascade deleted | ✅ Pass | 814ms | — |
+| LIFE-01 | Update status to Booked then Shipped → 3 history entries | ✅ Pass | 662ms | — |
+| LIFE-02 | Get order by ID returns correct data | ✅ Pass | 155ms | — |
+| LIFE-03 | Delete order → order + ledger cascade deleted | ✅ Pass | 867ms | — |
 
 ### ✅ Reports
 
 | ID | Test | Result | Duration | Error |
 |----|------|--------|----------|-------|
-| RPT-01 | getTransactions returns orders with correct margin | ✅ Pass | 227ms | — |
-| RPT-02 | getDirectoryWithBalances shows correct live balances | ✅ Pass | 17786ms | — |
+| RPT-01 | getTransactions returns orders with correct margin | ✅ Pass | 151ms | — |
+| RPT-02 | getDirectoryWithBalances shows correct live balances | ✅ Pass | 637ms | — |
 
 ---
 *Generated by api_test_suite.js*

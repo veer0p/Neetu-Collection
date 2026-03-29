@@ -11,8 +11,9 @@ export const supabaseService = {
             .from('profiles')
             .insert([{ phone, pin, name }])
             .select()
-            .single();
+            .maybeSingle();
         if (error) throw error;
+        if (!data) throw new Error('Failed to create user profile.');
 
         await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data));
         return data;
@@ -24,8 +25,9 @@ export const supabaseService = {
             .select('*')
             .eq('phone', phone)
             .eq('pin', pin)
-            .single();
+            .maybeSingle();
         if (error) throw error;
+        if (!data) throw new Error('Invalid phone number or PIN.');
 
         await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data));
         return data;
@@ -38,6 +40,33 @@ export const supabaseService = {
 
     async signOut() {
         await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    },
+
+    async getProfile(userId: string) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .maybeSingle();
+        if (error) throw error;
+        return data;
+    },
+
+    async updateProfile(userId: string, updates: any) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', userId)
+            .select()
+            .single();
+        if (error) throw error;
+
+        // Update local storage if it's the current user
+        const currentUser = await this.getCurrentUser();
+        if (currentUser && currentUser.id === userId) {
+            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(data));
+        }
+        return data;
     },
 
     // --- Order Services ---
@@ -223,23 +252,58 @@ export const supabaseService = {
         }
 
         // === DELETE-AND-RECREATE: Always rebuild ledger for this order ===
+        // We delete non-payment entries. Payments (PaymentIn/Out) are kept for cash history.
         if (isUpdate) {
             const { error: deleteError } = await supabase
                 .from('ledger')
                 .delete()
-                .eq('order_id', savedOrder.id);
+                .eq('order_id', savedOrder.id)
+                .not('transaction_type', 'in', '("PaymentIn","PaymentOut")'); // Keep cash history
             if (deleteError) throw deleteError;
         }
 
-        if (order.status === 'Canceled') return;
-
-        const ledgerEntries: any[] = [];
         const orderId = savedOrder.id;
-        const hasPickupPerson = !!order.pickupPersonId;
         const originalPrice = order.originalPrice || 0;
         const sellingPrice = order.sellingPrice || 0;
         const pickupCharges = order.pickupCharges || 0;
         const shippingCharges = order.shippingCharges || 0;
+
+        if (order.status === 'Canceled' || order.status === 'Returned') {
+            const isReturn = order.status === 'Returned';
+
+            // Refund Logic:
+            // If it was Paid, we need a balancing entry to zero out the person's balance
+            // without deleting the original Payment entry (for cash history).
+            const balancingEntries: any[] = [];
+
+            if (order.customerPaymentStatus === 'Paid') {
+                // Customer paid us. We owe them back.
+                // Product Only Refund for returns, Full for cancels.
+                const refundAmount = isReturn ? (sellingPrice) : (sellingPrice + shippingCharges + pickupCharges);
+                balancingEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.customerId || null,
+                    amount: refundAmount, transaction_type: 'Refund', notes: `${order.status} Refund`,
+                });
+            }
+
+            if (order.pickupPaymentStatus === 'Paid' && order.pickupPersonId) {
+                // We paid the driver. We need to recover the cost if it was a cancel.
+                // Depending on shop policy, usually we recover both if canceled.
+                balancingEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
+                    amount: (pickupCharges + shippingCharges), transaction_type: 'Recovery', notes: `${order.status} Recovery`,
+                });
+            }
+
+            if (balancingEntries.length > 0) {
+                const { error: balError } = await supabase.from('ledger').insert(balancingEntries);
+                if (balError) throw balError;
+            }
+            return;
+        }
+
+        const ledgerEntries: any[] = [];
+        const hasPickupPerson = !!order.pickupPersonId;
         const paidByDriver = order.paidByDriver || false;
 
         ledgerEntries.push({
@@ -368,14 +432,153 @@ export const supabaseService = {
             is_settled: false,
         }]);
         if (error) throw error;
+        // Automatically try to settle pending orders with the new balance
+        await this.autoSettleEntries(entry.personId || '', userId);
+    },
+
+    async autoSettleEntries(personId: string, userId: string): Promise<void> {
+        // 0. Fetch person type to know which status field to update later
+        const { data: person } = await supabase.from('directory').select('type').eq('id', personId).single();
+        if (!person) return;
+
+        // 1. Fetch all ledger entries for this person
+        const { data: entries, error } = await supabase
+            .from('ledger')
+            .select('id, amount, is_settled, order_id')
+            .eq('person_id', personId)
+            .order('created_at', { ascending: true });
+
+        if (error || !entries) return;
+
+        // 2. Separate into manual (Payments) and unsettled order-linked entries
+        const manualEntries = entries.filter(e => e.order_id === null);
+        const unsettledOrders = entries.filter(e => e.order_id !== null && !e.is_settled);
+
+        if (unsettledOrders.length === 0) return;
+
+        let manualBalance = manualEntries.reduce((sum, e) => sum + Number(e.amount), 0);
+
+        // 3. FIFO Match: youngest payments vs oldest orders
+        const toSettle: string[] = [];
+        const orderIdsToUpdate: string[] = [];
+
+        for (const orderEntry of unsettledOrders) {
+            const amount = Number(orderEntry.amount);
+            // If manual balance is opposite sign (credit) and covers the order amount
+            if (manualBalance !== 0 && (manualBalance > 0 !== amount > 0)) {
+                if (Math.abs(manualBalance) >= Math.abs(amount)) {
+                    toSettle.push(orderEntry.id);
+                    if (orderEntry.order_id) orderIdsToUpdate.push(orderEntry.order_id);
+                    manualBalance += amount;
+                } else {
+                    // Insufficient balance to cover this entire order
+                    break;
+                }
+            }
+        }
+
+        if (toSettle.length > 0) {
+            // Update ledger entries
+            await supabase
+                .from('ledger')
+                .update({ is_settled: true, settled_at: new Date().toISOString() })
+                .in('id', toSettle);
+
+            // Sync with orders table so edits don't revert settlement
+            if (orderIdsToUpdate.length > 0) {
+                const statusField = person.type === 'Customer' ? 'customer_payment_status'
+                    : person.type === 'Vendor' ? 'vendor_payment_status'
+                        : 'pickup_payment_status';
+
+                await supabase
+                    .from('orders')
+                    .update({ [statusField]: 'Paid' })
+                    .in('id', orderIdsToUpdate);
+            }
+        }
+    },
+
+    async bulkDeleteOrders(ids: string[]): Promise<void> {
+        if (!ids.length) return;
+
+        // As requested, delete the orders but do NOT touch any payment or other entries 
+        // that might have been settled previously.
+        const { error } = await supabase
+            .from('orders')
+            .delete()
+            .in('id', ids);
+
+        if (error) throw error;
+    },
+
+    async processOrderCancel(orderId: string, userId: string, options: { refundFromShop: boolean, refundFromStaff: boolean }): Promise<void> {
+        const order = await this.getOrderById(orderId);
+        if (!order) throw new Error('Order not found');
+        await this.saveOrder({ ...order, status: 'Canceled' }, userId);
+
+        if (options.refundFromShop && order.vendorId) {
+            await supabase.from('ledger').insert([{
+                user_id: userId, person_id: order.vendorId, order_id: orderId,
+                amount: -order.originalPrice, transaction_type: 'PaymentIn', notes: 'Shop Refund (Cancel)'
+            }]);
+        }
+    },
+
+    async processOrderReturn(orderId: string, userId: string, returnFee: number): Promise<void> {
+        const order = await this.getOrderById(orderId);
+        if (!order) throw new Error('Order not found');
+        await this.saveOrder({ ...order, status: 'Returned' }, userId);
+
+        if (returnFee > 0) {
+            await supabase.from('ledger').insert([{
+                user_id: userId, person_id: order.customerId, order_id: orderId,
+                amount: -returnFee, transaction_type: 'Expense', notes: 'Order Return Fee'
+            }]);
+        }
     },
 
     async updateOrderPaymentStatus(orderId: string, field: 'vendor' | 'customer' | 'pickup', status: 'Paid' | 'Udhar'): Promise<void> {
         const fieldMap: Record<string, string> = { vendor: 'vendor_payment_status', customer: 'customer_payment_status', pickup: 'pickup_payment_status' };
-        const { error: updateError } = await supabase.from('orders').update({ [fieldMap[field]]: status }).eq('id', orderId);
-        if (updateError) throw updateError;
+
+        // 1. Fetch the full order first to get amount and person details
         const { data: fullOrder, error: fetchError } = await supabase.from('orders').select('*').eq('id', orderId).single();
         if (fetchError) throw fetchError;
+
+        // 2. If marking as Paid, always record a corresponding Payment entry in the ledger
+        if (status === 'Paid') {
+            let amount = 0;
+            let type: any = 'PaymentIn';
+            let personId = '';
+
+            if (field === 'customer') {
+                amount = -Number(fullOrder.selling_price); // PaymentIn (Customer pays us, reduces their debt)
+                type = 'PaymentIn';
+                personId = fullOrder.customer_id;
+            } else if (field === 'vendor') {
+                amount = Number(fullOrder.original_price); // PaymentOut (We pay vendor, reduces our debt)
+                type = 'PaymentOut';
+                personId = fullOrder.vendor_id;
+            } else if (field === 'pickup') {
+                amount = Number(fullOrder.pickup_charges || 0) + Number(fullOrder.shipping_charges || 0);
+                type = 'PaymentOut';
+                personId = fullOrder.pickup_person_id;
+            }
+
+            if (personId) {
+                const { error: paymentError } = await supabase.from('ledger').insert([{
+                    user_id: fullOrder.user_id, person_id: personId, order_id: orderId, amount,
+                    transaction_type: type, notes: `Settled with "Mark Paid" (Order #${orderId.slice(0, 4)})`,
+                    is_settled: false,
+                }]);
+                if (paymentError) throw paymentError;
+            }
+        }
+
+        // 3. Update the order table status
+        const { error: updateError } = await supabase.from('orders').update({ [fieldMap[field]]: status }).eq('id', orderId);
+        if (updateError) throw updateError;
+
+        // 4. Rebuild the ledger entries for this order (to set is_settled = true)
         await this.saveOrder({
             id: fullOrder.id, date: fullOrder.date, productId: fullOrder.product_id, customerId: fullOrder.customer_id, vendorId: fullOrder.vendor_id,
             originalPrice: Number(fullOrder.original_price), sellingPrice: Number(fullOrder.selling_price),
@@ -383,7 +586,9 @@ export const supabaseService = {
             trackingId: fullOrder.tracking_id, courierName: fullOrder.courier_name,
             pickupCharges: Number(fullOrder.pickup_charges), shippingCharges: Number(fullOrder.shipping_charges),
             status: fullOrder.status, notes: fullOrder.notes,
-            vendorPaymentStatus: fullOrder.vendor_payment_status, customerPaymentStatus: fullOrder.customer_payment_status, pickupPaymentStatus: fullOrder.pickup_payment_status,
+            vendorPaymentStatus: field === 'vendor' ? status : fullOrder.vendor_payment_status,
+            customerPaymentStatus: field === 'customer' ? status : fullOrder.customer_payment_status,
+            pickupPaymentStatus: field === 'pickup' ? status : fullOrder.pickup_payment_status,
         }, fullOrder.user_id);
     },
 
@@ -478,15 +683,10 @@ export const supabaseService = {
 
     async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
         const { data: directoryData, error: directoryError } = await supabase
-            .from('directory').select('*, ledger:ledger(amount, is_settled, order_id)').eq('user_id', userId);
+            .from('directory').select('*, ledger:ledger(amount)').eq('user_id', userId);
         if (directoryError) return [];
         return (directoryData || []).map((item: any) => ({
-            ...item, balance: (item.ledger || []).reduce((acc: number, l: any) => {
-                // Manual entries (order_id null) always count.
-                // Order entries only count if not settled.
-                if (l.order_id === null || !l.is_settled) return acc + Number(l.amount);
-                return acc;
-            }, 0),
+            ...item, balance: (item.ledger || []).reduce((acc: number, l: any) => acc + Number(l.amount), 0),
             createdAt: new Date(item.created_at).getTime()
         })) as DirectoryItem[];
     },

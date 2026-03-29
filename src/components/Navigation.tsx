@@ -17,6 +17,7 @@ import AccountDetail from '../screens/AccountDetail';
 import OrderDetail from '../screens/OrderDetail';
 import Directory from '../screens/Directory';
 import Reports from '../screens/Reports';
+import PrivacyPolicy from '../screens/PrivacyPolicy';
 
 const Stack = createNativeStackNavigator();
 
@@ -107,6 +108,7 @@ export const AppNavigation = () => {
                         <Stack.Screen name="Directory" component={Directory} />
                         <Stack.Screen name="Insights" component={Reports} />
                         <Stack.Screen name="AddEntry" component={AddEntry} />
+                        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicy} />
                     </>
                 )}
             </Stack.Navigator>

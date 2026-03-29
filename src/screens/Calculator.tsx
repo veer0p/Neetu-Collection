@@ -33,15 +33,23 @@ const CalcButton = ({
     const getBgColor = () => {
         if (type === 'equal') return isDark ? '#818CF8' : '#4F46E5';
         if (type === 'op') return isDark ? 'rgba(129, 140, 248, 0.15)' : 'rgba(79, 70, 229, 0.08)';
-        if (type === 'special') return isDark ? 'rgba(248, 113, 113, 0.15)' : 'rgba(239, 68, 68, 0.08)';
-        return isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)';
+        if (type === 'special') return isDark ? 'rgba(248, 113, 113, 0.2)' : 'rgba(239, 68, 68, 0.1)';
+        return isDark ? 'rgba(255, 255, 255, 0.08)' : '#F8FAFC';
+    };
+
+    const getBorderColor = () => {
+        if (type === 'equal') return isDark ? '#818CF8' : '#4F46E5';
+        if (type === 'op') return isDark ? 'rgba(129, 140, 248, 0.3)' : 'rgba(79, 70, 229, 0.15)';
+        if (type === 'special') return isDark ? 'rgba(248, 113, 113, 0.3)' : 'rgba(239, 68, 68, 0.15)';
+        // Visible blue-tinted border for number buttons in light mode
+        return isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(79, 70, 229, 0.45)';
     };
 
     const getTextColor = () => {
         if (type === 'equal') return '#FFFFFF';
         if (type === 'op') return isDark ? '#A5B4FC' : '#4F46E5';
         if (type === 'special') return isDark ? '#FCA5A5' : '#EF4444';
-        return isDark ? '#E2E8F0' : '#1E293B';
+        return isDark ? '#E2E8F0' : '#475569';
     };
 
     return (
@@ -51,12 +59,13 @@ const CalcButton = ({
             style={{
                 width: size,
                 height: size,
-                borderRadius: size / 2.5,
+                borderRadius: size / 2.2, // More rounded, consistent shape
                 backgroundColor: getBgColor(),
+                borderWidth: 1.5,
+                borderColor: getBorderColor(),
                 justifyContent: 'center',
                 alignItems: 'center',
             }}
-            className="shadow-sm"
         >
             {Icon ? (
                 <Icon size={24} color={getTextColor()} strokeWidth={2.5} />
@@ -141,7 +150,7 @@ export default function Calculator() {
 
                     {/* Keypad */}
                     <View
-                        className="bg-white dark:bg-slate-900 rounded-t-[40px] px-6 pt-10 pb-12 shadow-2xl border-t border-black/5 dark:border-white/5"
+                        className="bg-surface dark:bg-background-dark rounded-t-[40px] px-6 pt-10 pb-12 border-t border-divider dark:border-divider-dark"
                         style={{ gap: BUTTON_GAP, paddingBottom: isWeb ? 48 : 128 }}
                     >
                         <View className="flex-row justify-between">

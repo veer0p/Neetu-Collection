@@ -22,13 +22,13 @@ export interface Transaction {
     courierName?: string;
     pickupCharges?: number;
     shippingCharges?: number;
-    status?: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
+    status?: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned';
     notes?: string;
     statusHistory?: StatusHistoryEntry[];
     createdAt: number;
     amount?: number; // For Payment/Expense types
 }
-export type OrderStatus = 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
+export type OrderStatus = 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned';
 
 export interface Order {
     id: string;
@@ -50,7 +50,7 @@ export interface Order {
     courierName?: string;
     pickupCharges?: number;
     shippingCharges?: number;
-    status: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled';
+    status: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned';
     vendorPaymentStatus?: 'Paid' | 'Udhar';
     customerPaymentStatus?: 'Paid' | 'Udhar';
     pickupPaymentStatus?: 'Paid' | 'Udhar';

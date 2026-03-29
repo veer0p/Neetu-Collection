@@ -203,15 +203,15 @@ export default function Ledger({ navigation }: { navigation: any }) {
                             <TouchableOpacity
                                 key={t.id}
                                 onPress={() => setFilter(t.id)}
-                                className={cn(
-                                    "px-4 py-2 rounded-full",
-                                    filter === t.id ? "bg-accent" : "bg-surface dark:bg-surface-dark"
-                                )}
+                                style={{
+                                    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999,
+                                    backgroundColor: filter === t.id ? '#4F46E5' : (isDark ? '#1E293B' : '#F1F5F9'),
+                                }}
                             >
-                                <Text className={cn(
-                                    "font-sans-semibold text-xs",
-                                    filter === t.id ? "text-white" : "text-secondary dark:text-secondary-dark"
-                                )}>{t.label}</Text>
+                                <Text style={{
+                                    fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12,
+                                    color: filter === t.id ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                                }}>{t.label}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>

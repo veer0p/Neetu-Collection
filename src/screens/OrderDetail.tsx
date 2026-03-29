@@ -87,6 +87,7 @@ export default function OrderDetail({ route, navigation }: any) {
             case 'Shipped': return 'bg-accent/10 text-accent dark:text-accent-dark';
             case 'Booked': return 'bg-warning/10 text-warning dark:text-warning-dark';
             case 'Canceled': return 'bg-danger/10 text-danger dark:text-danger-dark';
+            case 'Returned': return 'bg-secondary/10 text-secondary dark:text-secondary-dark';
             default: return 'bg-surface dark:bg-surface-dark text-secondary dark:text-secondary-dark';
         }
     };

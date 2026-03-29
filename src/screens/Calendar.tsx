@@ -177,17 +177,19 @@ export default function Calendar({ navigation }: any) {
                                     {day && (
                                         <TouchableOpacity
                                             onPress={() => handleDatePress(day)}
-                                            className={cn(
-                                                "flex-1 items-center justify-center rounded-xl",
-                                                selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-                                                    ? "bg-accent" : ""
-                                            )}
+                                            style={{
+                                                flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12,
+                                                backgroundColor: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                                                    ? '#4F46E5' : 'transparent',
+                                            }}
                                         >
-                                            <Text className={cn(
-                                                "font-sans text-sm",
-                                                selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-                                                    ? "text-white font-sans-bold" : "text-primary dark:text-primary-dark"
-                                            )}>
+                                            <Text style={{
+                                                fontSize: 14,
+                                                fontFamily: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                                                    ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_400Regular',
+                                                color: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                                                    ? '#FFFFFF' : (isDark ? '#E2E8F0' : '#1E293B'),
+                                            }}>
                                                 {day}
                                             </Text>
                                         </TouchableOpacity>

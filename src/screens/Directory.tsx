@@ -176,19 +176,18 @@ export default function Directory() {
                                 <TouchableOpacity
                                     key={tab.id}
                                     onPress={() => setActiveTab(tab.id)}
-                                    className={cn(
-                                        "px-6 py-2.5 rounded-full border",
-                                        activeTab === tab.id
-                                            ? "bg-accent border-accent"
-                                            : "bg-surface dark:bg-surface-dark border-divider dark:border-divider-dark"
-                                    )}
+                                    style={{
+                                        paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, borderWidth: 1,
+                                        backgroundColor: activeTab === tab.id ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
+                                        borderColor: activeTab === tab.id ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
+                                    }}
                                 >
                                     <View className="flex-row items-center">
                                         <tab.icon size={14} color={activeTab === tab.id ? "white" : "#64748b"} />
-                                        <Text className={cn(
-                                            "font-sans-semibold text-xs ml-2",
-                                            activeTab === tab.id ? "text-white" : "text-secondary dark:text-secondary-dark"
-                                        )}>{tab.label}</Text>
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, marginLeft: 8,
+                                            color: activeTab === tab.id ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                                        }}>{tab.label}</Text>
                                     </View>
                                 </TouchableOpacity>
                             ))}

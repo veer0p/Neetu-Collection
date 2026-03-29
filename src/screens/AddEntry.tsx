@@ -20,7 +20,7 @@ import { OrderStatus, Order } from '../utils/types';
 import { useTheme } from '../context/ThemeContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 
-const STATUS_OPTIONS: OrderStatus[] = ['Pending', 'Booked', 'Shipped', 'Delivered', 'Canceled'];
+const STATUS_OPTIONS: OrderStatus[] = ['Pending', 'Booked', 'Shipped', 'Delivered', 'Canceled', 'Returned'];
 
 // Move inner components outside to prevent re-mounting on state changes (fixes keyboard closing issue)
 const Section = ({ title, icon: Icon, children, isDark }: any) => (
@@ -33,22 +33,37 @@ const Section = ({ title, icon: Icon, children, isDark }: any) => (
     </View>
 );
 
-const ToggleRow = ({ label, value, options, onToggle, isDark }: { label: string, value: string, options: { label: string, value: string, color: string }[], onToggle: (v: any) => void, isDark: boolean }) => (
-    <View className="mb-4">
-        <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs mb-2 ml-1 uppercase">{label}</Text>
-        <View className="flex-row bg-surface dark:bg-surface-dark rounded-2xl p-1.5 border border-divider dark:border-divider-dark justify-between">
-            {options.map(opt => (
-                <TouchableOpacity
-                    key={opt.value}
-                    onPress={() => onToggle(opt.value)}
-                    className={cn("flex-1 py-3 rounded-xl items-center mx-1", value === opt.value ? opt.color : "bg-transparent")}
-                >
-                    <Text className={cn("text-[10px] font-sans-bold", value === opt.value ? "text-white" : "text-secondary dark:text-secondary-dark")}>{opt.label}</Text>
-                </TouchableOpacity>
-            ))}
+const ToggleRow = ({ label, value, options, onToggle, isDark }: { label: string, value: string, options: { label: string, value: string, color: string }[], onToggle: (v: any) => void, isDark: boolean }) => {
+    const getColor = (colorClass: string) => {
+        if (colorClass.includes('danger')) return '#EF4444';
+        if (colorClass.includes('success')) return '#10B981';
+        if (colorClass.includes('blue')) return '#3B82F6';
+        return '#4F46E5';
+    };
+
+    return (
+        <View className="mb-4">
+            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] mb-2 ml-1 uppercase tracking-widest">{label}</Text>
+            <View className="flex-row bg-surface dark:bg-surface-dark rounded-2xl p-1.5 border border-divider/50 dark:border-divider-dark/20 justify-between">
+                {options.map(opt => (
+                    <TouchableOpacity
+                        key={opt.value}
+                        onPress={() => onToggle(opt.value)}
+                        style={{
+                            flex: 1, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginHorizontal: 4,
+                            backgroundColor: value === opt.value ? getColor(opt.color) : 'transparent',
+                        }}
+                    >
+                        <Text style={{
+                            fontSize: 10, fontFamily: 'PlusJakartaSans_700Bold', textTransform: 'uppercase', letterSpacing: 0.8,
+                            color: value === opt.value ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                        }}>{opt.label}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
         </View>
-    </View>
-);
+    );
+};
 
 export default function AddEntry({ route, navigation }: any) {
     const editingOrder = route.params?.orderData as Order | undefined;
@@ -129,6 +144,7 @@ export default function AddEntry({ route, navigation }: any) {
         { label: 'Shipped', value: 'Shipped', color: isDark ? '#818CF8' : '#4F46E5' },
         { label: 'Delivered', value: 'Delivered', color: isDark ? '#34D399' : '#10B981' },
         { label: 'Canceled', value: 'Canceled', color: isDark ? '#F87171' : '#EF4444' },
+        { label: 'Returned', value: 'Returned', color: isDark ? '#94A3B8' : '#6B7280' },
     ];
 
     const getStatusStyle = (status: string) => {
@@ -571,9 +587,9 @@ export default function AddEntry({ route, navigation }: any) {
                         <Button
                             onPress={handleSave}
                             disabled={loading || !form.productName || !form.customerName || !form.vendorName}
-                            className="mt-4 mb-10 h-16 rounded-2xl"
+                            className="mt-4 mb-10 h-14"
                         >
-                            <Text className="text-white font-sans-bold text-lg">{loading ? 'Saving...' : 'Save Order'}</Text>
+                            {loading ? 'Saving...' : 'Save Order'}
                         </Button>
                     </ScrollView>
                 </KeyboardAvoidingView>

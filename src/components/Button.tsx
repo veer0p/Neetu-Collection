@@ -1,11 +1,12 @@
 import React from 'react';
-import { TouchableOpacity, Text, TouchableOpacityProps, View } from 'react-native';
+import { TouchableOpacity, Text, TouchableOpacityProps, View, ActivityIndicator } from 'react-native';
 import { cn } from '../utils/cn';
 
 interface ButtonProps extends TouchableOpacityProps {
     variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
     className?: string;
     textClassName?: string;
+    loading?: boolean;
     children: React.ReactNode;
 }
 
@@ -14,6 +15,7 @@ export const Button = ({
     variant = 'primary',
     className,
     textClassName,
+    loading,
     ...props
 }: ButtonProps) => {
 
@@ -50,14 +52,23 @@ export const Button = ({
     return (
         <TouchableOpacity
             activeOpacity={0.7}
+            disabled={loading || props.disabled}
             className={cn(
-                "rounded-2xl px-6 h-12 flex-row items-center justify-center border transition-all active:scale-95",
+                "rounded-2xl px-8 h-14 flex-row items-center justify-center border transition-all active:scale-95",
                 variantClasses[variant as keyof typeof variantClasses],
+                (loading || props.disabled) && "opacity-50",
                 className
             )}
             {...props}
         >
-            {renderChildren(children, textClasses[variant as keyof typeof textClasses])}
+            {loading ? (
+                <View className="flex-row items-center">
+                    <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'ghost' ? '#4F46E5' : 'white'} />
+                    <Text className={cn("ml-2", textClasses[variant as keyof typeof textClasses])}>Processing...</Text>
+                </View>
+            ) : (
+                renderChildren(children, textClasses[variant as keyof typeof textClasses])
+            )}
         </TouchableOpacity>
     );
 };

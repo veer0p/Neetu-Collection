@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Modal, KeyboardAvoidingView, Platform, ScrollView, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Background } from '../components/Background';
@@ -9,16 +9,18 @@ import { Button } from '../components/Button';
 import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
 import { DirectoryItem, LedgerEntry } from '../utils/types';
-import { ArrowLeft, Plus, IndianRupee, FileText, TrendingUp, TrendingDown, X, Trash2, Lock } from 'lucide-react-native';
-
-import { useRoute } from '@react-navigation/native';
+import {
+    ArrowLeft, Plus, IndianRupee, FileText, TrendingUp, TrendingDown,
+    X, Trash2, Lock, Check, Circle, AlertTriangle, RotateCcw, Share2, ChevronRight
+} from 'lucide-react-native';
+import { ledgerExporter } from '../utils/ledgerExporter';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useResponsive } from '../hooks/useResponsive';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-export default function AccountDetail({ navigation }: { navigation: any }) {
-    const route = useRoute();
+export default function AccountDetail({ navigation, route }: { navigation: any, route: any }) {
     const { person } = route.params as { person: DirectoryItem };
     const { userId } = useTransactions();
     const { isDark } = useTheme();
@@ -40,23 +42,126 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
     const [confirmSettleVisible, setConfirmSettleVisible] = useState(false);
     const [settleEntry, setSettleEntry] = useState<LedgerEntry | null>(null);
     const [settleLoading, setSettleLoading] = useState(false);
+    const [deleteEntryLoading, setDeleteEntryLoading] = useState(false);
     const [deleteEntryVisible, setDeleteEntryVisible] = useState(false);
     const [deleteEntry, setDeleteEntry] = useState<LedgerEntry | null>(null);
-    const [deleteEntryLoading, setDeleteEntryLoading] = useState(false);
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkActionLoading, setBulkActionLoading] = useState(false);
+    const [shareModalVisible, setShareModalVisible] = useState(false);
+    const [sharing, setSharing] = useState(false);
+    const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
 
-    useEffect(() => { loadLedger(); }, []);
-    useFocusEffect(useCallback(() => { loadLedger(); }, []));
+    const [shareType, setShareType] = useState<'Full' | 'Udhar'>('Full');
+    const [startDate, setStartDate] = useState(new Date(new Date().setMonth(new Date().getMonth() - 1)));
+    const [endDate, setEndDate] = useState(new Date());
+    const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
+    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type: 'success' | 'danger' | 'warning' | 'info' }>({
+        visible: false, title: '', message: '', type: 'info'
+    });
+
+    useEffect(() => { loadLedger(); loadProfile(); }, []);
+    useFocusEffect(useCallback(() => { loadLedger(); loadProfile(); }, [userId]));
+
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                if (selectionMode) {
+                    setSelectionMode(false);
+                    setSelectedIds(new Set());
+                    return true;
+                }
+                return false;
+            };
+
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+            return () => subscription.remove();
+        }, [selectionMode])
+    );
+
+    const loadProfile = async () => {
+        if (!userId) return;
+        const profile = await supabaseService.getProfile(userId);
+        setCurrentUserProfile(profile);
+    };
+
+    const handleShare = async () => {
+        setSharing(true);
+        try {
+            let dataToShare = [...ledger];
+
+            // 1. Filter by Date Range
+            dataToShare = ledger.filter(e => {
+                const txDate = new Date(e.createdAt);
+                return txDate >= startDate && txDate <= endDate;
+            });
+
+            // 2. Filter by Type
+            if (shareType === 'Udhar') {
+                dataToShare = dataToShare.filter(e => e.transactionType !== 'PaymentIn' && e.transactionType !== 'PaymentOut' && !e.isSettled);
+            }
+
+            // Sort by date ascending for PDF
+            dataToShare.sort((a, b) => a.createdAt - b.createdAt);
+
+            if (dataToShare.length === 0) {
+                setAlertConfig({
+                    visible: true,
+                    title: 'No Data',
+                    message: 'No transactions found for the selected range.',
+                    type: 'warning'
+                });
+                return;
+            }
+
+            await ledgerExporter.shareStatement(
+                person.name,
+                dataToShare,
+                currentUserProfile?.upi_id,
+                'Neetu Collection',
+                shareType === 'Udhar'
+            );
+            setShareModalVisible(false);
+        } catch (e) {
+            console.error('Share failed:', e);
+            setAlertConfig({
+                visible: true,
+                title: 'Generation Failed',
+                message: 'Could not create the statement. Please try again.',
+                type: 'danger'
+            });
+        } finally {
+            setSharing(false);
+        }
+    };
+
+    const setQuickRange = (type: 'Today' | 'Week' | 'Month' | 'All') => {
+        const end = new Date();
+        let start = new Date();
+        switch (type) {
+            case 'Today':
+                start.setHours(0, 0, 0, 0);
+                break;
+            case 'Week':
+                start.setDate(end.getDate() - 7);
+                break;
+            case 'Month':
+                start.setMonth(end.getMonth() - 1);
+                break;
+            case 'All':
+                start = new Date(0); // Beginning of time
+                break;
+        }
+        setStartDate(start);
+        setEndDate(end);
+    };
 
     const loadLedger = async () => {
         setLoading(true);
         const data = await supabaseService.getLedgerEntries(person.id);
 
-        // Manual entries (order_id null) always count towards balance integrity.
-        // Order entries (linked to order_id) only count if not yet settled.
-        const total = data.reduce((acc, curr) => {
-            if (curr.orderId === null || !curr.isSettled) return acc + curr.amount;
-            return acc;
-        }, 0);
+        // Net Balance: Sum of all entries (ignoring isSettled for balance integrity)
+        const total = data.reduce((acc, curr) => acc + curr.amount, 0);
         setFullBalance(total);
 
         // For Vendor accounts: hide entries that are internally settled by driver
@@ -71,6 +176,65 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
         });
         setLedger(filteredData);
         setLoading(false);
+    };
+
+    // Helper: Group entries by date for "Select by Date" functionality
+    const groupedLedger = ledger.reduce((acc: any, item) => {
+        const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Unknown';
+        if (!acc[dateStr]) acc[dateStr] = [];
+        acc[dateStr].push(item);
+        return acc;
+    }, {});
+
+    const toggleDateSelection = (dateStr: string) => {
+        const idsInDate = groupedLedger[dateStr]
+            .map((item: LedgerEntry) => item.orderId ? `order:${item.orderId}` : `entry:${item.id}`);
+
+        const newSelected = new Set(selectedIds);
+        const allSelected = idsInDate.every((id: string) => newSelected.has(id));
+
+        if (allSelected) {
+            idsInDate.forEach((id: string) => newSelected.delete(id));
+            if (newSelected.size === 0) setSelectionMode(false);
+        } else {
+            setSelectionMode(true);
+            idsInDate.forEach((id: string) => newSelected.add(id));
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const [actionModalVisible, setActionModalVisible] = useState(false);
+    const [actionType, setActionType] = useState<'Cancel' | 'Return'>('Cancel');
+    const [refundFromShop, setRefundFromShop] = useState(true);
+    const [refundFromStaff, setRefundFromStaff] = useState(true);
+    const [returnFee, setReturnFee] = useState('0');
+
+    const handleBulkAction = (type: 'Cancel' | 'Return') => {
+        setActionType(type);
+        setActionModalVisible(true);
+    };
+
+    const confirmBulkAction = async () => {
+        setBulkActionLoading(true);
+        try {
+            const ids = Array.from(selectedIds);
+            for (const id of ids) {
+                if (actionType === 'Cancel') {
+                    await supabaseService.processOrderCancel(id.replace('order:', ''), userId!, { refundFromShop, refundFromStaff });
+                } else {
+                    await supabaseService.processOrderReturn(id, userId!, parseFloat(returnFee) || 0);
+                }
+            }
+            setSelectionMode(false);
+            setSelectedIds(new Set());
+            setActionModalVisible(false);
+            await loadLedger();
+        } catch (e) {
+            console.error('Bulk action failed:', e);
+            alert('Action failed');
+        } finally {
+            setBulkActionLoading(false);
+        }
     };
 
     const handleAddPayment = async () => {
@@ -93,7 +257,66 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
         loadLedger();
     };
 
+    const toggleSelection = (id: string) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+            if (newSelected.size === 0) setSelectionMode(false);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const handleLongPress = (item: LedgerEntry) => {
+        setSelectionMode(true);
+        const id = item.orderId ? `order:${item.orderId}` : `entry:${item.id}`;
+        const newSelected = new Set(selectedIds);
+        newSelected.add(id);
+        setSelectedIds(newSelected);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        setDeleteEntryVisible(true);
+    };
+
+    const confirmBulkDelete = async () => {
+        setBulkActionLoading(true);
+        try {
+            const orderIds: string[] = [];
+            const entryIds: string[] = [];
+
+            selectedIds.forEach(id => {
+                if (id.startsWith('order:')) orderIds.push(id.replace('order:', ''));
+                else if (id.startsWith('entry:')) entryIds.push(id.replace('entry:', ''));
+            });
+
+            if (orderIds.length > 0) await supabaseService.bulkDeleteOrders(orderIds);
+            if (entryIds.length > 0) {
+                for (const id of entryIds) {
+                    await supabaseService.deleteLedgerEntry(id);
+                }
+            }
+
+            setSelectionMode(false);
+            setSelectedIds(new Set());
+            setDeleteEntryVisible(false);
+            await loadLedger();
+        } catch (e) {
+            console.error('Bulk delete failed:', e);
+            alert('Delete failed');
+        } finally {
+            setBulkActionLoading(false);
+        }
+    };
+
     const handleEntryPress = (item: LedgerEntry) => {
+        const id = item.orderId ? `order:${item.orderId}` : `entry:${item.id}`;
+        if (selectionMode) {
+            toggleSelection(id);
+            return;
+        }
         setSelectedEntry(item);
         if (item.orderId) { setOrderModalVisible(true); }
         else { setEditNotes(item.notes || ''); setEditModalVisible(true); }
@@ -112,28 +335,30 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
     };
 
     const confirmEntrySettle = async () => {
-        if (!userId || !settleEntry) return;
+        if (!userId || !settleEntry) {
+            if (!userId) alert('Error: User session not found. Please log in again.');
+            return;
+        }
         setSettleLoading(true);
 
         try {
             if (settleEntry.orderId) {
-                // Order-linked entry: update the order payment status which triggers a full ledger rebuild
-                // with is_settled flags set correctly on the rebuilt entries
                 let field: 'customer' | 'vendor' | 'pickup' = 'customer';
                 if (settleEntry.transactionType === 'Purchase') field = 'vendor';
                 else if (settleEntry.transactionType === 'Expense') {
-                    // Determine by person type: vendor shipping vs pickup charges/product cost
                     field = person.type === 'Vendor' ? 'vendor' : 'pickup';
                 }
                 await supabaseService.updateOrderPaymentStatus(settleEntry.orderId, field, 'Paid');
             } else {
-                // Manual entry (no orderId): just mark this single entry as settled in-place
                 await supabaseService.settleLedgerEntry(settleEntry.id, userId);
             }
-            await loadLedger();
+            // Close modal immediately for a responsive feel
             setConfirmSettleVisible(false);
-        } catch (e) {
+            await loadLedger();
+        } catch (e: any) {
             console.error('Quick settle failed:', e);
+            alert('Error: ' + (e.message || 'Settlement failed'));
+            setConfirmSettleVisible(false);
         } finally {
             setSettleLoading(false);
         }
@@ -166,25 +391,42 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 {/* Header */}
-                <View className="px-6 pt-4 pb-2 flex-row items-center">
-                    <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
-                        <ArrowLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
-                    </TouchableOpacity>
-                    <View className="flex-1">
-                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{person.name}</Text>
-                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{person.type}</Text>
+                {selectionMode ? (
+                    <View className="px-6 pt-4 pb-2 flex-row items-center bg-accent/10">
+                        <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="p-2 mr-3">
+                            <X color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
+                        </TouchableOpacity>
+                        <Text className="flex-1 text-primary dark:text-primary-dark font-sans-bold text-lg">
+                            {selectedIds.size} Selected
+                        </Text>
                     </View>
-                    <TouchableOpacity
-                        onPress={() => {
-                            setPaymentForm({ ...paymentForm, type: person.type === 'Customer' ? 'PaymentIn' : 'PaymentOut' });
-                            setModalVisible(true);
-                        }}
-                        className="bg-accent px-4 py-2 rounded-full flex-row items-center"
-                    >
-                        <Plus color="white" size={16} />
-                        <Text className="text-white font-sans-bold text-xs ml-1">Pay</Text>
-                    </TouchableOpacity>
-                </View>
+                ) : (
+                    <View className="px-6 pt-4 pb-2 flex-row items-center">
+                        <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
+                            <ArrowLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
+                        </TouchableOpacity>
+                        <View className="flex-1">
+                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{person.name}</Text>
+                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{person.type}</Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => setShareModalVisible(true)}
+                            className="bg-surface dark:bg-surface-dark px-3 py-2 rounded-full mr-2 border border-divider dark:border-divider-dark"
+                        >
+                            <Share2 color={isDark ? '#818CF8' : '#4F46E5'} size={18} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => {
+                                setPaymentForm({ ...paymentForm, type: person.type === 'Customer' ? 'PaymentIn' : 'PaymentOut' });
+                                setModalVisible(true);
+                            }}
+                            className="bg-accent px-4 py-2 rounded-full flex-row items-center"
+                        >
+                            <Plus color="white" size={16} />
+                            <Text className="text-white font-sans-bold text-xs ml-1">Pay</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Balance */}
                 <View className="px-6 py-4">
@@ -204,31 +446,30 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                     </Card>
                 </View>
 
-                {/* Tabs - Fixed: using inline style height to prevent blown up pills */}
-                <View style={{ paddingHorizontal: 24, marginBottom: 12 }}>
+                {/* Tabs - Horizontal Scroll Filters */}
+                <View className="-mx-6 mb-3">
                     <ScrollView
-                        horizontal
+                        horizontal={true}
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ gap: 8 }}
+                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 4, gap: 10 }}
                     >
                         {filterTypes.map(t => (
                             <TouchableOpacity
                                 key={t}
                                 onPress={() => setTypeFilter(t)}
                                 style={{
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 999,
-                                    backgroundColor: typeFilter === t
-                                        ? (isDark ? '#818CF8' : '#4F46E5')
-                                        : (isDark ? '#1E293B' : '#F8F9FB'),
+                                    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16, borderWidth: 1,
+                                    backgroundColor: typeFilter === t ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
+                                    borderColor: typeFilter === t ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
                                 }}
                             >
                                 <Text style={{
-                                    fontSize: 12,
-                                    fontFamily: 'PlusJakartaSans_600SemiBold',
-                                    color: typeFilter === t ? '#FFFFFF' : (isDark ? '#94A3B8' : '#6B7280'),
-                                }}>{t}</Text>
+                                    fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10,
+                                    textTransform: 'uppercase', letterSpacing: 1.5,
+                                    color: typeFilter === t ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                                }}>
+                                    {t}
+                                </Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
@@ -239,10 +480,39 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                     <View className="flex-1 justify-center items-center"><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" /></View>
                 ) : (
                     <FlatList
-                        data={ledger.filter(e => typeFilter === 'All' || e.transactionType === typeFilter)}
-                        keyExtractor={item => item.id}
+                        data={(() => {
+                            const filtered = ledger.filter(e => typeFilter === 'All' || e.transactionType === typeFilter);
+                            // Insert Date Headers into the flat list for selection
+                            const result: any[] = [];
+                            let lastDate = '';
+                            filtered.forEach(item => {
+                                const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown';
+                                if (dateStr !== lastDate) {
+                                    result.push({ isHeader: true, dateStr, originalDate: item.createdAt });
+                                    lastDate = dateStr;
+                                }
+                                result.push(item);
+                            });
+                            return result;
+                        })()}
+                        keyExtractor={(item, index) => item.isHeader ? `header-${item.dateStr}` : item.id}
                         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
                         renderItem={({ item, index }) => {
+                            if (item.isHeader) {
+                                return (
+                                    <View className="flex-row items-center py-4 mt-2">
+                                        <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-widest">{item.dateStr}</Text>
+                                        {selectionMode && (
+                                            <TouchableOpacity
+                                                onPress={() => toggleDateSelection(new Date(item.originalDate).toLocaleDateString())}
+                                                className="px-3 py-1 bg-accent/10 rounded-lg border border-accent/20"
+                                            >
+                                                <Text className="text-accent font-sans-bold text-[10px]">Select Date</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                );
+                            }
                             // Inflow = money coming into our "pocket" (Sales or customer payments)
                             // Outflow = money going out of our "pocket" (Purchases, expenses, or payments to vendors)
                             const isInflow = ['Sale', 'PaymentIn'].includes(item.transactionType);
@@ -256,17 +526,40 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                             // Time display: for settled entries show payment time; for others show entry creation time
                             const displayTime = alreadySettled && item.settledAt ? item.settledAt : item.createdAt;
 
+                            const selectionId = item.orderId ? `order:${item.orderId}` : `entry:${item.id}`;
+                            const isSelected = selectedIds.has(selectionId);
+
                             return (
                                 <TouchableOpacity
                                     onPress={() => handleEntryPress(item)}
+                                    onLongPress={() => handleLongPress(item)}
                                     activeOpacity={0.6}
                                     style={{
                                         flexDirection: 'row', alignItems: 'center',
                                         paddingVertical: 14,
                                         borderTopWidth: index > 0 ? 1 : 0,
                                         borderTopColor: isDark ? '#1E293B' : '#F1F5F9',
+                                        backgroundColor: selectionMode && isSelected ? (isDark ? 'rgba(129,140,248,0.1)' : 'rgba(79,70,229,0.05)') : 'transparent',
+                                        paddingHorizontal: selectionMode ? 12 : 0,
+                                        marginHorizontal: selectionMode ? -12 : 0,
+                                        borderRadius: 12,
                                     }}
                                 >
+                                    {/* Selection Checkbox */}
+                                    {
+                                        selectionMode && (
+                                            <View className="mr-3">
+                                                {selectedIds.has(selectionId) ? (
+                                                    <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
+                                                        <Check color="white" size={12} strokeWidth={3} />
+                                                    </View>
+                                                ) : (
+                                                    <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
+                                                )}
+                                            </View>
+                                        )
+                                    }
+
                                     {/* Left icon */}
                                     <View style={{
                                         width: 38, height: 38, borderRadius: 10,
@@ -366,7 +659,7 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                                         </View>
                                     </View>
 
-                                    {/* Right: amount + delete/lock */}
+                                    {/* Right: amount */}
                                     <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
                                         <Text style={{
                                             fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15,
@@ -375,22 +668,10 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                                             {isInflow ? '+' : '-'}₹{Math.abs(item.amount).toLocaleString()}
                                         </Text>
                                         <View style={{ marginTop: 4 }}>
-                                            {!item.orderId ? (
-                                                <TouchableOpacity
-                                                    onPress={(e) => { e.stopPropagation(); handleDeleteEntry(item); }}
-                                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                                                    style={{
-                                                        width: 24, height: 24, borderRadius: 6,
-                                                        backgroundColor: 'rgba(239,68,68,0.10)',
-                                                        alignItems: 'center', justifyContent: 'center',
-                                                    }}
-                                                >
-                                                    <Trash2 size={11} color="#EF4444" />
-                                                </TouchableOpacity>
+                                            {item.orderId ? (
+                                                <Lock size={11} color={isDark ? '#475569' : '#CBD5E1'} style={{ opacity: 0.4 }} />
                                             ) : (
-                                                <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center', opacity: 0.2 }}>
-                                                    <Lock size={11} color={isDark ? '#94A3B8' : '#6B7280'} />
-                                                </View>
+                                                <View style={{ width: 11, height: 11 }} />
                                             )}
                                         </View>
                                     </View>
@@ -420,17 +701,29 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                                 <View className="flex-row mb-6 bg-surface dark:bg-background-dark p-1 rounded-2xl border border-divider dark:border-divider-dark">
                                     <TouchableOpacity
                                         onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentIn' })}
-                                        className={cn("flex-1 py-3 rounded-xl items-center", paymentForm.type === 'PaymentIn' ? "bg-success" : "bg-transparent")}
+                                        style={{
+                                            flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+                                            backgroundColor: paymentForm.type === 'PaymentIn' ? '#10B981' : 'transparent',
+                                        }}
                                     >
-                                        <Text className={cn("font-sans-bold text-xs", paymentForm.type === 'PaymentIn' ? "text-white" : "text-secondary dark:text-secondary-dark")}>
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
+                                            color: paymentForm.type === 'PaymentIn' ? '#FFFFFF' : '#94A3B8',
+                                        }}>
                                             IN
                                         </Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentOut' })}
-                                        className={cn("flex-1 py-3 rounded-xl items-center", paymentForm.type === 'PaymentOut' ? "bg-danger" : "bg-transparent")}
+                                        style={{
+                                            flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+                                            backgroundColor: paymentForm.type === 'PaymentOut' ? '#EF4444' : 'transparent',
+                                        }}
                                     >
-                                        <Text className={cn("font-sans-bold text-xs", paymentForm.type === 'PaymentOut' ? "text-white" : "text-secondary dark:text-secondary-dark")}>
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
+                                            color: paymentForm.type === 'PaymentOut' ? '#FFFFFF' : '#94A3B8',
+                                        }}>
                                             OUT
                                         </Text>
                                     </TouchableOpacity>
@@ -514,7 +807,240 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
                         </Card>
                     </View>
                 </Modal>
+
+                {/* Bulk Action Footer */}
+                {selectionMode && (
+                    <View
+                        className="absolute bottom-10 left-6 right-6 bg-surface dark:bg-surface-dark p-4 rounded-3xl flex-row items-center justify-between border border-secondary/10"
+                        style={{ elevation: 10 }}
+                    >
+                        <TouchableOpacity
+                            onPress={() => handleBulkAction('Cancel')}
+                            className="bg-danger/10 h-14 rounded-2xl flex-1 mr-2 flex-row items-center justify-center border border-danger/20"
+                        >
+                            <X color="#EF4444" size={18} />
+                            <Text className="text-danger font-sans-bold ml-2">Cancel</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => handleBulkAction('Return')}
+                            className="bg-warning/10 h-14 rounded-2xl flex-1 mx-2 flex-row items-center justify-center border border-warning/20"
+                        >
+                            <RotateCcw color="#F59E0B" size={18} />
+                            <Text className="text-warning font-sans-bold ml-2">Return</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={handleBulkDelete}
+                            className="bg-danger h-14 rounded-2xl flex-row items-center justify-center flex-1 ml-2"
+                        >
+                            <Trash2 color="#FFFFFF" size={18} />
+                            <Text className="text-white font-sans-bold ml-2">Delete</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {/* Date Pickers */}
+                {showPicker && (
+                    <DateTimePicker
+                        value={showPicker === 'start' ? startDate : endDate}
+                        mode="date"
+                        display="default"
+                        onChange={(event, selectedDate) => {
+                            setShowPicker(null);
+                            if (selectedDate) {
+                                if (showPicker === 'start') setStartDate(selectedDate);
+                                else setEndDate(selectedDate);
+                            }
+                        }}
+                    />
+                )}
+
+                {/* Share Statement Modal */}
+                <Modal visible={shareModalVisible} animationType="slide" transparent>
+                    <View className="flex-1 justify-end bg-black/40">
+                        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShareModalVisible(false)} />
+                        <View className="bg-white dark:bg-surface-dark rounded-t-[40px] p-8 pb-10">
+                            <View className="items-center mb-8">
+                                <View className="w-16 h-1.5 bg-divider dark:bg-divider-dark rounded-full mb-8" />
+                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl">Share Statement</Text>
+                                <Text className="text-secondary dark:text-secondary-dark font-sans text-sm mt-1">Configure your PDF report</Text>
+                            </View>
+
+                            {/* Toggle Type */}
+                            <View className="mb-8">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-4 ml-1">Report Type</Text>
+                                <View className="flex-row bg-background dark:bg-background-dark p-1.5 rounded-2xl border border-divider dark:border-divider-dark">
+                                    <TouchableOpacity
+                                        onPress={() => setShareType('Udhar')}
+                                        style={{
+                                            flex: 1, paddingVertical: 14, borderRadius: 12,
+                                            alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
+                                            backgroundColor: shareType === 'Udhar' ? '#4F46E5' : 'transparent',
+                                        }}
+                                    >
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14,
+                                            color: shareType === 'Udhar' ? '#FFFFFF' : '#94A3B8',
+                                        }}>Udhar Only</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => setShareType('Full')}
+                                        style={{
+                                            flex: 1, paddingVertical: 14, borderRadius: 12,
+                                            alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
+                                            backgroundColor: shareType === 'Full' ? '#4F46E5' : 'transparent',
+                                        }}
+                                    >
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14,
+                                            color: shareType === 'Full' ? '#FFFFFF' : '#94A3B8',
+                                        }}>Full Ledger</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Date Selection */}
+                            <View className="mb-8">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-4 ml-1">Date Range</Text>
+
+                                {/* Quick Options */}
+                                <View className="flex-row flex-wrap gap-2 mb-4">
+                                    {['Today', 'Week', 'Month', 'All'].map((q) => (
+                                        <TouchableOpacity
+                                            key={q}
+                                            onPress={() => setQuickRange(q as any)}
+                                            className="px-4 py-2 bg-background dark:bg-background-dark border border-divider dark:border-divider-dark rounded-xl"
+                                        >
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs">{q}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <View className="flex-row items-center gap-3">
+                                    <TouchableOpacity
+                                        onPress={() => setShowPicker('start')}
+                                        className="flex-1 bg-background dark:bg-background-dark p-4 rounded-2xl border border-divider dark:border-divider-dark"
+                                    >
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] uppercase mb-1">Start Date</Text>
+                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">{startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
+                                    </TouchableOpacity>
+                                    <ChevronRight size={16} color="#94A3B8" />
+                                    <TouchableOpacity
+                                        onPress={() => setShowPicker('end')}
+                                        className="flex-1 bg-background dark:bg-background-dark p-4 rounded-2xl border border-divider dark:border-divider-dark"
+                                    >
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] uppercase mb-1">End Date</Text>
+                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">{endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <Button
+                                onPress={handleShare}
+                                loading={sharing}
+                                className="h-16 rounded-2xl"
+                            >
+                                <Share2 color="white" size={20} style={{ marginRight: 8 }} />
+                                <Text className="text-white font-sans-bold text-lg">Generate PDF</Text>
+                            </Button>
+                        </View>
+                    </View>
+                </Modal>
+
+                <ConfirmDialog
+                    visible={alertConfig.visible}
+                    title={alertConfig.title}
+                    message={alertConfig.message}
+                    type={alertConfig.type}
+                    onConfirm={() => setAlertConfig({ ...alertConfig, visible: false })}
+                    onCancel={() => setAlertConfig({ ...alertConfig, visible: false })}
+                    confirmText="Okay"
+                    cancelText=""
+                />
             </SafeAreaView>
+
+            {/* Special Action Modal (Cancel/Return) */}
+            <Modal visible={actionModalVisible} transparent animationType="fade" onRequestClose={() => setActionModalVisible(false)}>
+                <View className="flex-1 bg-black/60 justify-center p-6">
+                    <Card className="p-6">
+                        <View className="flex-row justify-between items-center mb-4">
+                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{actionType === 'Cancel' ? 'Cancel Orders' : 'Return Orders'}</Text>
+                            <TouchableOpacity onPress={() => setActionModalVisible(false)}>
+                                <X color={isDark ? '#94A3B8' : '#6B7280'} size={20} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View className="mb-6">
+                            <Text className="text-secondary dark:text-secondary-dark font-sans text-sm mb-4">
+                                Processing {selectedIds.size} orders. This will update statuses and generate refund entries as per your business logic.
+                            </Text>
+
+                            {actionType === 'Cancel' ? (
+                                <View className="gap-3">
+                                    <TouchableOpacity
+                                        onPress={() => setRefundFromShop(!refundFromShop)}
+                                        className="flex-row items-center p-4 bg-secondary/5 rounded-2xl"
+                                    >
+                                        <View className={cn("w-5 h-5 rounded border-2 items-center justify-center mr-3",
+                                            refundFromShop ? "bg-accent border-accent" : "border-secondary/30")}>
+                                            {refundFromShop && <Check color="white" size={12} strokeWidth={4} />}
+                                        </View>
+                                        <View>
+                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">Get refund from shop?</Text>
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">Adds PaymentIn from vendor for original price</Text>
+                                        </View>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                        onPress={() => setRefundFromStaff(!refundFromStaff)}
+                                        className="flex-row items-center p-4 bg-secondary/5 rounded-2xl"
+                                    >
+                                        <View className={cn("w-5 h-5 rounded border-2 items-center justify-center mr-3",
+                                            refundFromStaff ? "bg-accent border-accent" : "border-secondary/30")}>
+                                            {refundFromStaff && <Check color="white" size={12} strokeWidth={4} />}
+                                        </View>
+                                        <View>
+                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">Recoup Logistics?</Text>
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">Recoup shipping/pickup price from staff ledgers</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                </View>
+                            ) : (
+                                <View>
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2 uppercase">Return Fee (Per Order)</Text>
+                                    <Input
+                                        value={returnFee}
+                                        onChangeText={setReturnFee}
+                                        keyboardType="numeric"
+                                        placeholder="0"
+                                    />
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-2 italic">
+                                        * Product price will be refunded; shipping/pickup will not.
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View className="flex-row gap-3">
+                            <Button
+                                className="flex-1" variant="outline"
+                                onPress={() => setActionModalVisible(false)}
+                            >
+                                Go Back
+                            </Button>
+                            <Button
+                                className="flex-1"
+                                onPress={confirmBulkAction}
+                                loading={bulkActionLoading}
+                                variant={actionType === 'Cancel' ? 'danger' : 'primary'}
+                            >
+                                Confirm {actionType}
+                            </Button>
+                        </View>
+                    </Card>
+                </View>
+            </Modal>
 
             <ConfirmDialog
                 visible={confirmSettleVisible}
@@ -528,13 +1054,13 @@ export default function AccountDetail({ navigation }: { navigation: any }) {
             />
             <ConfirmDialog
                 visible={deleteEntryVisible}
-                title="Delete Transaction?"
-                message="This will permanently delete this manual payment entry. This cannot be undone."
-                onConfirm={confirmDeleteEntry}
+                title={selectionMode ? "Delete Multiple Entries?" : "Delete Transaction?"}
+                message={selectionMode ? `Are you sure you want to delete ${selectedIds.size} transactions? This cannot be undone.` : "This will permanently delete this manual payment entry. This cannot be undone."}
+                onConfirm={selectionMode ? confirmBulkDelete : confirmDeleteEntry}
                 onCancel={() => setDeleteEntryVisible(false)}
                 confirmText="Delete"
                 type="danger"
-                loading={deleteEntryLoading}
+                loading={deleteEntryLoading || bulkActionLoading}
             />
         </Background >
     );
