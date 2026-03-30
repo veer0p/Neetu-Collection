@@ -62,12 +62,15 @@ export const AppNavigation = () => {
 
     const checkSession = async () => {
         try {
+            console.log('[DEBUG] Checking session...');
             const currentUser = await supabaseService.getCurrentUser();
+            console.log('[DEBUG] Session user:', currentUser?.phone || 'none');
             setUser(currentUser);
         } catch (e) {
-            console.error('Failed to load session');
+            console.error('[DEBUG] Failed to load session:', e);
         } finally {
             setLoading(false);
+            console.log('[DEBUG] AppNavigation loading finished');
         }
     };
 

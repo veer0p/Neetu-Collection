@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import "./global.css";
+console.log('[DEBUG] App.tsx: Loading component...');
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
@@ -36,6 +37,7 @@ export default function App() {
 
   // Fonts or error indicates we are ready to proceed
   useEffect(() => {
+    console.log('[DEBUG] fontsLoaded:', fontsLoaded, 'fontError:', fontError);
     if (fontsLoaded || fontError) {
       setAppIsReady(true);
     }
@@ -52,12 +54,15 @@ export default function App() {
   // Hide the native splash screen ONLY once our JS is running and fonts are handled
   useEffect(() => {
     if (appIsReady) {
+      console.log('[DEBUG] App is ready, hiding splash screen in 500ms...');
       // Hide native splash after a tiny delay to ensure custom splash is rendered
       const timer = setTimeout(async () => {
         try {
+          console.log('[DEBUG] Calling SplashScreen.hideAsync()...');
           await SplashScreen.hideAsync();
+          console.log('[DEBUG] SplashScreen.hideAsync() success');
         } catch (e) {
-          console.warn(e);
+          console.warn('[DEBUG] SplashScreen.hideAsync() error:', e);
         }
       }, 500);
       return () => clearTimeout(timer);

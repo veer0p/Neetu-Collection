@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import { registerRootComponent } from 'expo';
+console.log('[DEBUG] index.ts: Starting execution...');
 
 import App from './App';
 
