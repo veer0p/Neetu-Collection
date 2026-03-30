@@ -5,16 +5,6 @@ module.exports = function (api) {
             "babel-preset-expo",
             "nativewind/babel",
         ],
-        plugins: [
-            "react-native-reanimated/plugin",
-            [
-                "module-resolver",
-                {
-                    alias: {
-                        "react-native-worklets": "react-native-worklets-core",
-                    },
-                },
-            ],
-        ],
+        plugins: ["react-native-reanimated/plugin"],
     };
 };
