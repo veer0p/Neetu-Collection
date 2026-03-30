@@ -35,14 +35,18 @@ const NAV_ITEMS: { name: TabName; label: string; Icon: any }[] = [
 
 // ─── Web Sidebar + Manual Screen Renderer ────────────────────────────────────
 
-const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
+const WebLayout = ({ user, onLogout, parentNavigation }: { user: any; onLogout: () => void; parentNavigation?: any }) => {
     const { isDark } = useTheme();
     const [activeTab, setActiveTab] = useState<TabName>('Home');
+    const [routeParams, setRouteParams] = useState<Record<string, any>>({});
 
     // Fake navigation object so screens that call navigation.navigate / navigation.goBack work
     const makeNavigation = (navigate: (name: string, params?: any) => void) => ({
         navigate,
-        goBack: () => setActiveTab('Home'),
+        goBack: () => {
+            setRouteParams(prev => ({ ...prev, [activeTab]: undefined }));
+            setActiveTab('Home');
+        },
         push: navigate,
         replace: navigate,
         setOptions: () => { },
@@ -52,13 +56,16 @@ const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
         canGoBack: () => false,
         dispatch: () => { },
         reset: () => { },
-        getParent: () => null,
+        getParent: () => parentNavigation,
         getState: () => ({}),
     });
 
-    const navigate = (name: string) => {
+    const navigate = (name: string, params?: any) => {
         if (NAV_ITEMS.find(n => n.name === name)) {
+            setRouteParams(prev => ({ ...prev, [name]: params }));
             setActiveTab(name as TabName);
+        } else if (parentNavigation) {
+            parentNavigation.navigate(name, params);
         }
     };
 
@@ -66,7 +73,8 @@ const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
 
     const renderScreen = () => {
         const nav = navigation as any;
-        const s = (C: any, extra?: object) => React.createElement(C, { navigation: nav, ...extra });
+        const mockRoute = { params: routeParams[activeTab] || {} };
+        const s = (C: any, extra?: object) => React.createElement(C, { navigation: nav, route: mockRoute, ...extra });
         switch (activeTab) {
             case 'Home': return s(Dashboard, { user, onLogout });
             case 'Orders': return s(Transactions);
@@ -111,8 +119,7 @@ const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
                 {/* Nav items */}
                 {NAV_ITEMS.map(({ name, label, Icon }) => {
                     const isFocused = activeTab === name;
-                    const isAdd = name === 'Add';
-                    const iconColor = isAdd ? '#FFFFFF' : isFocused ? (isDark ? '#818CF8' : '#4F46E5') : (isDark ? '#64748B' : '#94A3B8');
+                    const iconColor = isFocused ? (isDark ? '#818CF8' : '#4F46E5') : (isDark ? '#64748B' : '#94A3B8');
 
                     return (
                         <TouchableOpacity
@@ -123,9 +130,7 @@ const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
                                 flexDirection: 'row', alignItems: 'center',
                                 paddingHorizontal: 10, paddingVertical: 10,
                                 borderRadius: 10, marginBottom: 4,
-                                backgroundColor: isAdd
-                                    ? (isDark ? '#818CF8' : '#4F46E5')
-                                    : isFocused
+                                backgroundColor: isFocused
                                         ? (isDark ? 'rgba(129,140,248,0.12)' : 'rgba(79,70,229,0.08)')
                                         : 'transparent',
                             }}
@@ -137,7 +142,7 @@ const WebLayout = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
                             />
                             <Text style={{
                                 marginLeft: 10,
-                                fontFamily: isFocused || isAdd ? 'PlusJakartaSans_600SemiBold' : 'PlusJakartaSans_400Regular',
+                                fontFamily: isFocused ? 'PlusJakartaSans_600SemiBold' : 'PlusJakartaSans_400Regular',
                                 fontSize: 13,
                                 color: iconColor,
                             }}>
@@ -272,11 +277,11 @@ const MobileNavigator = ({ user, onLogout }: { user: any; onLogout: () => void }
 
 // ─── Main Export ─────────────────────────────────────────────────────────────
 
-export const MainTabs = ({ user, onLogout }: { user: any; onLogout: () => void }) => {
+export const MainTabs = ({ user, onLogout, navigation }: { user: any; onLogout: () => void; navigation?: any }) => {
     const { isWeb, isWide } = useResponsive();
 
     if (isWeb && isWide) {
-        return <WebLayout user={user} onLogout={onLogout} />;
+        return <WebLayout user={user} onLogout={onLogout} parentNavigation={navigation} />;
     }
 
     return <MobileNavigator user={user} onLogout={onLogout} />;

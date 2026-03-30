@@ -35,7 +35,7 @@
     "plugins": [
       "expo-asset"
     ],
-    "owner": "veer.0p",
+
     "extra": {
       "eas": {
         "projectId": "9aa7b0d0-6c68-48f4-8cb9-d61ea2113870"

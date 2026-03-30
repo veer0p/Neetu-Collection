@@ -27,7 +27,7 @@ const getAddresses = (address: string | undefined): string[] => {
 export default function Directory() {
     const { userId } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const [activeTab, setActiveTab] = useState<DirectoryType>('Customer');
     const [items, setItems] = useState<DirectoryItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -137,7 +137,8 @@ export default function Directory() {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
-                <View className="px-6 pt-4 pb-2">
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
+                    <View className="px-6 pt-4 pb-2">
                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Directory</Text>
 
                     {/* Search & Add */}
@@ -351,6 +352,7 @@ export default function Directory() {
 
                     </View>
                 </Modal>
+                </View>
             </SafeAreaView>
         </Background>
     );

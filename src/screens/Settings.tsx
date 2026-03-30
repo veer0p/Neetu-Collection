@@ -21,7 +21,7 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
     const { isEnabled, toggleBiometrics } = useBiometrics();
     const { theme, toggleTheme, isDark } = useTheme();
     const { refresh } = useTransactions();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const [seeding, setSeeding] = React.useState(false);
     const [seedConfirmVisible, setSeedConfirmVisible] = React.useState(false);
     const [paymentModalVisible, setPaymentModalVisible] = React.useState(false);
@@ -117,6 +117,7 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                 <View className="px-6 pt-4 pb-2">
                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-1">Settings</Text>
                     <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">App preferences & account</Text>
@@ -273,6 +274,7 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
                         </Card>
                     </View>
                 </Modal>
+                </View>
             </SafeAreaView>
         </Background>
     );

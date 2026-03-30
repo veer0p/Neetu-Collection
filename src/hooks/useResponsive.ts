@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dimensions, Platform } from 'react-native';
 
 const CONTENT_MAX_WIDTH = 640;
+const DESKTOP_MAX_WIDTH = 1024;
 
 export function useResponsive() {
     const [dims, setDims] = useState(() => Dimensions.get('window'));
@@ -24,6 +25,15 @@ export function useResponsive() {
             alignSelf: 'center' as const,
         }
         : {};
+        
+    // Desktop container: on web, cap at DESKTOP_MAX_WIDTH and center
+    const desktopContainerStyle = isWeb
+        ? {
+            maxWidth: DESKTOP_MAX_WIDTH,
+            width: '100%' as const,
+            alignSelf: 'center' as const,
+        }
+        : {};
 
     // Full-width container that self-centers
     const wrapperStyle = isWeb
@@ -40,8 +50,11 @@ export function useResponsive() {
         windowHeight: dims.height,
         /** Apply to a scroll/flatlist content container on web to cap width */
         containerStyle,
+        /** Apply to wide content like Dashboards or Ledgers on web */
+        desktopContainerStyle,
         /** Apply to a View that wraps a scroll area, centers content on web */
         wrapperStyle,
         CONTENT_MAX_WIDTH,
+        DESKTOP_MAX_WIDTH,
     };
 }

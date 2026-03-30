@@ -19,6 +19,7 @@ import { cn } from '../utils/cn';
 import { OrderStatus, Order } from '../utils/types';
 import { useTheme } from '../context/ThemeContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useResponsive } from '../hooks/useResponsive';
 
 const STATUS_OPTIONS: OrderStatus[] = ['Pending', 'Booked', 'Shipped', 'Delivered', 'Canceled', 'Returned'];
 
@@ -69,6 +70,7 @@ export default function AddEntry({ route, navigation }: any) {
     const editingOrder = route.params?.orderData as Order | undefined;
     const { userId, refresh } = useTransactions();
     const { isDark } = useTheme();
+    const { desktopContainerStyle } = useResponsive();
 
     // Refs for keyboard focus flow
     const customerRef = useRef<TextInput>(null);
@@ -343,7 +345,7 @@ export default function AddEntry({ route, navigation }: any) {
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
                     <ScrollView
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ padding: 24, paddingBottom: isKeyboardVisible ? 300 : 80 }}
+                        contentContainerStyle={[{ padding: 24, paddingBottom: isKeyboardVisible ? 300 : 80 }, desktopContainerStyle]}
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* Status Selection */}
@@ -373,27 +375,39 @@ export default function AddEntry({ route, navigation }: any) {
 
                         {/* Date Selection */}
                         <Section title="Order Date" icon={CalendarDays} isDark={isDark}>
-                            <TouchableOpacity
-                                onPress={() => setShowDatePicker(true)}
-                                activeOpacity={0.7}
-                            >
-                                <View pointerEvents="none">
-                                    <Input
-                                        label="Date (DD/MM/YYYY)"
-                                        placeholder="Select Date"
-                                        value={form.date}
-                                        editable={false}
-                                        leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
-                                    />
-                                </View>
-                            </TouchableOpacity>
-                            {showDatePicker && (
-                                <DateTimePicker
-                                    value={parseDate(form.date)}
-                                    mode="date"
-                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                    onChange={handleDateChange}
+                            {Platform.OS === 'web' ? (
+                                <Input
+                                    label="Date (DD/MM/YYYY)"
+                                    placeholder="DD/MM/YYYY"
+                                    value={form.date}
+                                    onChangeText={(text) => setForm(prev => ({ ...prev, date: text }))}
+                                    leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
                                 />
+                            ) : (
+                                <>
+                                    <TouchableOpacity
+                                        onPress={() => setShowDatePicker(true)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View pointerEvents="none">
+                                            <Input
+                                                label="Date (DD/MM/YYYY)"
+                                                placeholder="Select Date"
+                                                value={form.date}
+                                                editable={false}
+                                                leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
+                                            />
+                                        </View>
+                                    </TouchableOpacity>
+                                    {showDatePicker && (
+                                        <DateTimePicker
+                                            value={parseDate(form.date)}
+                                            mode="date"
+                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                            onChange={handleDateChange}
+                                        />
+                                    )}
+                                </>
                             )}
                         </Section>
 

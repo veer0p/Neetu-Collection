@@ -24,7 +24,7 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
     const { person } = route.params as { person: DirectoryItem };
     const { userId } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
 
 
     const [ledger, setLedger] = useState<LedgerEntry[]>([]);
@@ -161,13 +161,13 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
         const data = await supabaseService.getLedgerEntries(person.id);
 
         // Net Balance: Sum of all entries (ignoring isSettled for balance integrity)
-        const total = data.reduce((acc, curr) => acc + curr.amount, 0);
+        const total = data.reduce((acc: number, curr: any) => acc + curr.amount, 0);
         setFullBalance(total);
 
         // For Vendor accounts: hide entries that are internally settled by driver
         // (PaymentOut entries with "Paid by driver" notes are intermediary bookkeeping)
         // For Pickup Person accounts: show all entries (they need full visibility)
-        const filteredData = data.filter(entry => {
+        const filteredData = data.filter((entry: any) => {
             // Hide "Paid by driver" PaymentOut from vendor view — this was settled by pickup person, not shop owner directly
             if (person.type === 'Vendor' && entry.transactionType === 'PaymentOut' && entry.notes === 'Paid by driver') {
                 return false;
@@ -390,6 +390,7 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                 {/* Header */}
                 {selectionMode ? (
                     <View className="px-6 pt-4 pb-2 flex-row items-center bg-accent/10">
@@ -958,6 +959,7 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
                     confirmText="Okay"
                     cancelText=""
                 />
+                </View>
             </SafeAreaView>
 
             {/* Special Action Modal (Cancel/Return) */}

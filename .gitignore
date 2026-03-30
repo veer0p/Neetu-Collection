@@ -38,3 +38,14 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local Build Tools & Artifacts
+android_sdk/
+*.apk
+*.zip
+*_report.md
+expo_error.txt
+full_error.txt
+config.txt
+expo_logs.txt
+browser_verification.png

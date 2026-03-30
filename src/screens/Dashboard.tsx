@@ -17,7 +17,7 @@ import { useResponsive } from '../hooks/useResponsive';
 export default function Dashboard({ onLogout, user, navigation }: { onLogout: () => void; user: any; navigation: any }) {
     const { userId } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const [stats, setStats] = useState({
         netPosition: 0,
         receivable: 0,
@@ -156,7 +156,7 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? '#818CF8' : '#4F46E5'} />}
-                    contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}
+                    contentContainerStyle={[{ paddingBottom: isWeb ? 40 : 100 }, desktopContainerStyle]}
                 >
                     {/* Header */}
                     <View className="px-6 pt-4 pb-2">

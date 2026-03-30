@@ -32,7 +32,7 @@ export default function OrderDetail({ route, navigation }: any) {
     const orderId = route.params?.orderId || order?.id;
     const { deleteOrder } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
 
     const [ledgerEntries, setLedgerEntries] = useState<(LedgerEntry & { personName?: string })[]>([]);
     const [loading, setLoading] = useState(true);
@@ -95,6 +95,7 @@ export default function OrderDetail({ route, navigation }: any) {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}>
                     {/* Header */}
                     <View className="flex-row items-center px-6 pt-4 pb-2">
@@ -263,6 +264,7 @@ export default function OrderDetail({ route, navigation }: any) {
                         </View>
                     </View>
                 </ScrollView>
+                </View>
 
                 <ConfirmDialog
                     visible={deleteVisible}

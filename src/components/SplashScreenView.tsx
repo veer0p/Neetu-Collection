@@ -201,10 +201,9 @@ const styles = StyleSheet.create({
     },
     footerText: {
         fontSize: 13.5,
-        fontFamily: 'PlusJakartaSans_400Regular',
         letterSpacing: 0.3,
     },
     brandName: {
-        fontFamily: 'PlusJakartaSans_600SemiBold',
+        fontWeight: '600',
     },
 });

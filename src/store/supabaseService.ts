@@ -172,9 +172,12 @@ export const supabaseService = {
 
         let savedOrder;
         if (isUpdate) {
-            // Fetch existing order to preserve its status history
-            const { data: existing } = await supabase.from('orders').select('status_history').eq('id', order.id).single();
-            let history = existing?.status_history || [];
+            // Fetch existing order to preserve its status history if not provided
+            let history: any[] = order.statusHistory || [];
+            if (!order.statusHistory) {
+                const { data: existing } = await supabase.from('orders').select('status_history').eq('id', order.id).single();
+                history = existing?.status_history || [];
+            }
 
             // Only append to history if status has changed or history is empty
             if (order.status && (!history.length || history[history.length - 1].status !== order.status)) {
@@ -251,14 +254,16 @@ export const supabaseService = {
             savedOrder = data;
         }
 
-        // === DELETE-AND-RECREATE: Always rebuild ledger for this order ===
-        // We delete non-payment entries. Payments (PaymentIn/Out) are kept for cash history.
-        if (isUpdate) {
+        // === DELETE-AND-RECREATE: Rebuild ledger for this order ===
+        // Normal edits delete non-payment entries. 
+        // For Canceled/Returned, we keep the history and append reversals instead of deleting.
+        const isCanceledOrReturned = order.status === 'Canceled' || order.status === 'Returned';
+        if (isUpdate && !isCanceledOrReturned) {
             const { error: deleteError } = await supabase
                 .from('ledger')
                 .delete()
                 .eq('order_id', savedOrder.id)
-                .not('transaction_type', 'in', '("PaymentIn","PaymentOut")'); // Keep cash history
+                .not('transaction_type', 'in', '("PaymentIn","PaymentOut","Refund","Recovery","Reversal")');
             if (deleteError) throw deleteError;
         }
 
@@ -268,36 +273,43 @@ export const supabaseService = {
         const pickupCharges = order.pickupCharges || 0;
         const shippingCharges = order.shippingCharges || 0;
 
-        if (order.status === 'Canceled' || order.status === 'Returned') {
-            const isReturn = order.status === 'Returned';
+        if (isCanceledOrReturned) {
+            // Reversal Logic:
+            // Instead of deleting the history, we add balancing entries that zero out the amounts.
+            // 1. Fetch current status of ledger for this order to see what needs reversing
+            const { data: currentEntries } = await supabase
+                .from('ledger')
+                .select('*')
+                .eq('order_id', orderId)
+                .not('transaction_type', 'in', '("Refund","Recovery","Reversal")');
 
-            // Refund Logic:
-            // If it was Paid, we need a balancing entry to zero out the person's balance
-            // without deleting the original Payment entry (for cash history).
-            const balancingEntries: any[] = [];
+            const reversalEntries: any[] = [];
+            const alreadyReversed = await supabase
+                .from('ledger')
+                .select('notes')
+                .eq('order_id', orderId)
+                .in('transaction_type', ['Refund', 'Recovery', 'Reversal']);
 
-            if (order.customerPaymentStatus === 'Paid') {
-                // Customer paid us. We owe them back.
-                // Product Only Refund for returns, Full for cancels.
-                const refundAmount = isReturn ? (sellingPrice) : (sellingPrice + shippingCharges + pickupCharges);
-                balancingEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.customerId || null,
-                    amount: refundAmount, transaction_type: 'Refund', notes: `${order.status} Refund`,
+            // Only add reversals if not already reversed (prevent duplicate cancellation entries)
+            if (alreadyReversed.data?.length === 0) {
+                (currentEntries || []).forEach((e: any) => {
+                    reversalEntries.push({
+                        user_id: userId, order_id: orderId, person_id: e.person_id,
+                        amount: -Number(e.amount),
+                        transaction_type: e.transaction_type === 'Sale' ? 'Refund' : e.transaction_type === 'Purchase' ? 'Recovery' : 'Reversal',
+                        notes: `${order.status} Reversal of ${e.transaction_type}`,
+                    });
                 });
-            }
 
-            if (order.pickupPaymentStatus === 'Paid' && order.pickupPersonId) {
-                // We paid the driver. We need to recover the cost if it was a cancel.
-                // Depending on shop policy, usually we recover both if canceled.
-                balancingEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                    amount: (pickupCharges + shippingCharges), transaction_type: 'Recovery', notes: `${order.status} Recovery`,
-                });
-            }
+                // Special case: If order was "Returned", we might have extra fees to charge.
+                if (order.status === 'Returned' && (order.margin || 0) < 0) {
+                    // This could be handled via the prompt's returnFee, but here we cover the generic return.
+                }
 
-            if (balancingEntries.length > 0) {
-                const { error: balError } = await supabase.from('ledger').insert(balancingEntries);
-                if (balError) throw balError;
+                if (reversalEntries.length > 0) {
+                    const { error: revError } = await supabase.from('ledger').insert(reversalEntries);
+                    if (revError) throw revError;
+                }
             }
             return;
         }
@@ -451,12 +463,12 @@ export const supabaseService = {
         if (error || !entries) return;
 
         // 2. Separate into manual (Payments) and unsettled order-linked entries
-        const manualEntries = entries.filter(e => e.order_id === null);
-        const unsettledOrders = entries.filter(e => e.order_id !== null && !e.is_settled);
+        const manualEntries = entries.filter((e: any) => e.order_id === null);
+        const unsettledOrders = entries.filter((e: any) => e.order_id !== null && !e.is_settled);
 
         if (unsettledOrders.length === 0) return;
 
-        let manualBalance = manualEntries.reduce((sum, e) => sum + Number(e.amount), 0);
+        let manualBalance = manualEntries.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
 
         // 3. FIFO Match: youngest payments vs oldest orders
         const toSettle: string[] = [];
@@ -866,7 +878,7 @@ export const supabaseService = {
 
         if (dirError) throw dirError;
 
-        const getItems = (type: string) => createdItems.filter(i => i.type === type);
+        const getItems = (type: string) => (createdItems || []).filter((i: any) => i.type === type);
         const vendors = getItems('Vendor');
         const customers = getItems('Customer');
         const products = getItems('Product');

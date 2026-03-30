@@ -74,7 +74,7 @@ const InsightCard = ({ title, description, badge, icon: Icon, color }: any) => (
 export default function Reports({ navigation }: { navigation: any }) {
     const { orders: transactions, loading: transLoading } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const [activeTab, setActiveTab] = useState<Tab>('overview');
 
     const metrics = useMemo(() => {
@@ -230,6 +230,7 @@ export default function Reports({ navigation }: { navigation: any }) {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                 {renderHeader()}
                 <ScrollView
                     showsVerticalScrollIndicator={false}
@@ -343,6 +344,7 @@ export default function Reports({ navigation }: { navigation: any }) {
                         </View>
                     )}
                 </ScrollView>
+                </View>
             </SafeAreaView>
         </Background>
     );

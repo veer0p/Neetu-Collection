@@ -7,6 +7,7 @@ import { Button } from '../components/Button';
 import { supabaseService } from '../store/supabaseService';
 import { Phone, KeyRound, User, ArrowRight } from 'lucide-react-native';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useResponsive } from '../hooks/useResponsive';
 
 interface LoginProps {
     onLoginSuccess: (userData: any) => void;
@@ -19,6 +20,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { containerStyle } = useResponsive();
 
     const handleAuth = async () => {
         if (!phone || !pin || (isSignUp && !name)) { setError('Please fill in all fields.'); return; }
@@ -47,7 +49,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             <SafeAreaView className="flex-1">
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
                     <ScrollView
-                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}
+                        contentContainerStyle={[{ flexGrow: 1, justifyContent: 'center', padding: 24, alignSelf: 'center', width: '100%' }, containerStyle]}
                         keyboardShouldPersistTaps="handled"
                     >
                         <View className="mb-8 items-center">

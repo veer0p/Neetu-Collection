@@ -6,6 +6,7 @@ import { Background } from '../components/Background';
 import { Card } from '../components/Card';
 import { useTheme } from '../context/ThemeContext';
 import { cn } from '../utils/cn';
+import { useResponsive } from '../hooks/useResponsive';
 
 const PolicySection = ({ title, icon: Icon, content }: { title: string, icon: any, content: string }) => {
     const { isDark } = useTheme();
@@ -26,10 +27,12 @@ const PolicySection = ({ title, icon: Icon, content }: { title: string, icon: an
 
 export default function PrivacyPolicy({ navigation }: any) {
     const { isDark } = useTheme();
+    const { desktopContainerStyle } = useResponsive();
 
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                 <View className="px-6 pt-4 pb-2 flex-row items-center">
                     <TouchableOpacity
                         onPress={() => navigation.goBack()}
@@ -83,6 +86,7 @@ export default function PrivacyPolicy({ navigation }: any) {
                         <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-sm mt-4 uppercase tracking-[4px]">Neetu Collection</Text>
                     </View>
                 </ScrollView>
+                </View>
             </SafeAreaView>
         </Background>
     );

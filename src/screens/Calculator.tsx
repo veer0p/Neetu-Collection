@@ -83,7 +83,7 @@ const CalcButton = ({
 
 export default function Calculator() {
     const { isDark } = useTheme();
-    const { isWeb, CONTENT_MAX_WIDTH, windowWidth } = useResponsive();
+    const { isWeb, CONTENT_MAX_WIDTH, windowWidth, containerStyle } = useResponsive();
     const [expression, setExpression] = useState('');
     const [result, setResult] = useState('');
 
@@ -124,7 +124,7 @@ export default function Calculator() {
 
     return (
         <View className="flex-1 bg-surface dark:bg-surface-dark items-center">
-            <View style={[{ flex: 1, width: '100%' }, isWeb ? { maxWidth: CONTENT_MAX_WIDTH } : {}]}>
+            <View style={[{ flex: 1, width: '100%' }, containerStyle]}>
                 <SafeAreaView className="flex-1" edges={['top']}>
                     {/* Display Area */}
                     <View className="flex-1 justify-end px-8 pb-8">

@@ -12,7 +12,7 @@ import { useResponsive } from '../hooks/useResponsive';
 
 export default function Calendar({ navigation }: any) {
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const { userId } = useTransactions();
     const [viewDate, setViewDate] = useState(new Date());
     const [events, setEvents] = useState<{ [key: string]: { hasOrder: boolean; hasPayment: boolean; items: any[]; statuses: string[] } }>({});
@@ -124,6 +124,7 @@ export default function Calendar({ navigation }: any) {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                 <ScrollView
                     className="flex-1 px-6"
                     showsVerticalScrollIndicator={false}
@@ -274,6 +275,7 @@ export default function Calendar({ navigation }: any) {
                         )}
                     </View>
                 </ScrollView>
+                </View>
             </SafeAreaView>
         </Background>
     );

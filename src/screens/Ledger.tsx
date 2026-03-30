@@ -17,7 +17,7 @@ type FilterTab = 'all' | 'customers' | 'vendors' | 'pickup';
 export default function Ledger({ navigation }: { navigation: any }) {
     const { userId } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const [accounts, setAccounts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -182,7 +182,8 @@ export default function Ledger({ navigation }: { navigation: any }) {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
-                <View className="px-6 pt-4 pb-2">
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
+                    <View className="px-6 pt-4 pb-2">
                     <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Ledger</Text>
 
                     {/* Search */}
@@ -246,7 +247,7 @@ export default function Ledger({ navigation }: { navigation: any }) {
                         }
                     />
                 )}
-
+                </View>
                 <ConfirmDialog
                     visible={confirmVisible}
                     title="Confirm Settlement"

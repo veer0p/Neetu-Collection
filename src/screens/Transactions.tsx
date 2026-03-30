@@ -47,7 +47,7 @@ const getDateLabel = (dateStr: string): string => {
 export default function Transactions({ navigation }: { navigation: any }) {
     const { orders, loading, refresh, updateOrderStatus } = useTransactions();
     const { isDark } = useTheme();
-    const { isWeb } = useResponsive();
+    const { isWeb, desktopContainerStyle } = useResponsive();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('All');
     const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -241,7 +241,8 @@ export default function Transactions({ navigation }: { navigation: any }) {
     return (
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
-                <View className="px-6 pt-4 pb-2">
+                <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
+                    <View className="px-6 pt-4 pb-2">
                     {selectionMode ? (
                         <View className="-mx-6 px-6 py-2 mb-4 bg-accent/10 flex-row items-center">
                             <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="p-2 mr-3">
@@ -543,6 +544,7 @@ export default function Transactions({ navigation }: { navigation: any }) {
                         </Card>
                     </View>
                 </Modal>
+                </View>
             </SafeAreaView>
             <ConfirmDialog
                 visible={deleteDialogVisible}
