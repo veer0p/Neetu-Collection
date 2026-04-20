@@ -24,13 +24,13 @@ import { useResponsive } from '../hooks/useResponsive';
 const STATUS_OPTIONS: OrderStatus[] = ['Pending', 'Booked', 'Shipped', 'Delivered', 'Canceled', 'Returned'];
 
 // Move inner components outside to prevent re-mounting on state changes (fixes keyboard closing issue)
-const Section = ({ title, icon: Icon, children, isDark }: any) => (
-    <View className="mb-6">
+const Section = ({ title, icon: Icon, children, isDark, style }: any) => (
+    <View className="mb-6" style={style}>
         <View className="flex-row items-center mb-3 px-1">
             <Icon size={16} color={isDark ? '#818CF8' : '#4F46E5'} />
             <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm ml-2 uppercase tracking-wider">{title}</Text>
         </View>
-        <Card className="p-4">{children}</Card>
+        <Card className="p-4" style={{ overflow: 'visible' }}>{children}</Card>
     </View>
 );
 
@@ -126,6 +126,7 @@ export default function AddEntry({ route, navigation }: any) {
     const [statusPickerVisible, setStatusPickerVisible] = useState(false);
     const [successDialogVisible, setSuccessDialogVisible] = useState(false);
     const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+    const [activeField, setActiveField] = useState<string>('');
 
     // Reset form to blank whenever screen is focused (new order, not edit)
     useFocusEffect(useCallback(() => {
@@ -133,19 +134,22 @@ export default function AddEntry({ route, navigation }: any) {
             setForm({ ...emptyForm, date: new Date().toLocaleDateString('en-GB') });
             setSuggestions({ type: '', data: [] });
         }
-    }, [editingOrder]));
+        loadDirectory();
+    }, [editingOrder, userId]));
 
-    // Remove dynamic keyboard listeners as they cause layout jitters on some devices
-    /*
+    // Keyboard listeners
     useEffect(() => {
         const showSubscription = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
-        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+        const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+            setKeyboardVisible(false);
+            // Delay clearing so a tap on a suggestion can register first
+            setTimeout(() => setActiveField(''), 200);
+        });
         return () => {
             showSubscription.remove();
             hideSubscription.remove();
         };
     }, []);
-    */
 
     const statusOptions: PickerOption[] = [
         { label: 'Pending', value: 'Pending', color: '#9CA3AF' },
@@ -192,9 +196,7 @@ export default function AddEntry({ route, navigation }: any) {
         pickups: [] as any[]
     });
 
-    useEffect(() => {
-        loadDirectory();
-    }, [userId]);
+
 
     const loadDirectory = async () => {
         if (!userId) return;
@@ -210,6 +212,16 @@ export default function AddEntry({ route, navigation }: any) {
         });
     };
 
+    const getListForType = (type: string) => {
+        switch (type) {
+            case 'product': return masterData.products;
+            case 'vendor': return masterData.vendors;
+            case 'customer': return masterData.customers;
+            case 'pickup': return masterData.pickups;
+            default: return [];
+        }
+    };
+
     const handleSuggest = (text: string, type: 'product' | 'vendor' | 'customer' | 'pickup') => {
         let fieldName = '';
         let idFieldName = '';
@@ -223,12 +235,28 @@ export default function AddEntry({ route, navigation }: any) {
         }
 
         setForm(prev => ({ ...prev, [fieldName]: text, [idFieldName]: '' }));
+        setActiveField(type);
 
-        if (text.length > 1) {
+        if (text.length > 0) {
             const filtered = list.filter(item => item.name.toLowerCase().includes(text.toLowerCase()));
-            setSuggestions({ type, data: filtered.slice(0, 5) });
+            setSuggestions({ type, data: filtered.slice(0, 8) });
         } else {
-            setSuggestions({ type: '', data: [] });
+            // Show all items when field is empty (just focused)
+            setSuggestions({ type, data: list.slice(0, 8) });
+        }
+    };
+
+    const handleFieldFocus = (type: 'product' | 'vendor' | 'customer' | 'pickup') => {
+        setActiveField(type);
+        const list = getListForType(type);
+        const currentText = type === 'product' ? form.productName :
+            type === 'vendor' ? form.vendorName :
+                type === 'customer' ? form.customerName : form.pickupPersonName;
+        if (currentText.length > 0) {
+            const filtered = list.filter((item: any) => item.name.toLowerCase().includes(currentText.toLowerCase()));
+            setSuggestions({ type, data: filtered.slice(0, 8) });
+        } else {
+            setSuggestions({ type, data: list.slice(0, 8) });
         }
     };
 
@@ -259,8 +287,8 @@ export default function AddEntry({ route, navigation }: any) {
         return (
             <View
                 style={{
-                    position: 'absolute', top: 76, left: 0, right: 0, zIndex: 1000,
-                    elevation: 8,
+                    position: 'absolute', top: 76, left: 0, right: 0, zIndex: 9999,
+                    elevation: 20,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: 0.2,
@@ -432,13 +460,14 @@ export default function AddEntry({ route, navigation }: any) {
                         </Section>
 
                         {/* Product & Parties */}
-                        <Section title="Item & Parties" icon={Package} isDark={isDark}>
-                            <View style={{ zIndex: suggestions.type === 'product' ? 30 : 1 }}>
+                        <Section title="Item & Parties" icon={Package} isDark={isDark} style={{ zIndex: 100 }}>
+                            <View style={{ zIndex: activeField === 'product' ? 30 : 1 }}>
                                 <Input
                                     label="Product Name"
                                     placeholder="Enter product..."
                                     value={form.productName}
                                     onChangeText={text => handleSuggest(text, 'product')}
+                                    onFocus={() => handleFieldFocus('product')}
                                     leftIcon={<Package size={18} color="#9CA3AF" />}
                                     returnKeyType="next"
                                     onSubmitEditing={() => customerRef.current?.focus()}
@@ -446,13 +475,14 @@ export default function AddEntry({ route, navigation }: any) {
                                 {renderSuggestions('product')}
                             </View>
 
-                            <View style={{ zIndex: suggestions.type === 'customer' ? 20 : 1 }}>
+                            <View style={{ zIndex: activeField === 'customer' ? 20 : 1 }}>
                                 <Input
                                     ref={customerRef}
                                     label="Customer Name"
                                     placeholder="Enter customer..."
                                     value={form.customerName}
                                     onChangeText={text => handleSuggest(text, 'customer')}
+                                    onFocus={() => handleFieldFocus('customer')}
                                     leftIcon={<User size={18} color="#9CA3AF" />}
                                     returnKeyType="next"
                                     onSubmitEditing={() => vendorRef.current?.focus()}
@@ -461,26 +491,28 @@ export default function AddEntry({ route, navigation }: any) {
                             </View>
 
                             <View className="flex-row gap-4">
-                                <View className="flex-1" style={{ zIndex: suggestions.type === 'vendor' ? 10 : 1 }}>
+                                <View className="flex-1" style={{ zIndex: activeField === 'vendor' ? 10 : 1 }}>
                                     <Input
                                         ref={vendorRef}
                                         label="Vendor Name"
                                         placeholder="Supplier..."
                                         value={form.vendorName}
                                         onChangeText={text => handleSuggest(text, 'vendor')}
+                                        onFocus={() => handleFieldFocus('vendor')}
                                         leftIcon={<ShoppingBag size={18} color="#9CA3AF" />}
                                         returnKeyType="next"
                                         onSubmitEditing={() => pickupRef.current?.focus()}
                                     />
                                     {renderSuggestions('vendor')}
                                 </View>
-                                <View className="flex-1" style={{ zIndex: suggestions.type === 'pickup' ? 10 : 1 }}>
+                                <View className="flex-1" style={{ zIndex: activeField === 'pickup' ? 10 : 1 }}>
                                     <Input
                                         ref={pickupRef}
                                         label="Pickup Person"
                                         placeholder="Driver..."
                                         value={form.pickupPersonName}
                                         onChangeText={text => handleSuggest(text, 'pickup')}
+                                        onFocus={() => handleFieldFocus('pickup')}
                                         leftIcon={<Truck size={18} color="#9CA3AF" />}
                                         returnKeyType="next"
                                         onSubmitEditing={() => costPriceRef.current?.focus()}
@@ -689,15 +721,25 @@ export default function AddEntry({ route, navigation }: any) {
                             />
                         </Section>
 
-                        <Button
-                            onPress={handleSave}
-                            disabled={loading || !form.productName || !form.customerName || !form.vendorName}
-                            className="mt-4 mb-10 h-14"
-                        >
-                            {loading ? 'Saving...' : 'Save Order'}
-                        </Button>
                     </ScrollView>
                 </KeyboardAvoidingView>
+
+                {/* Sticky Save Button */}
+                <View style={{
+                    position: 'absolute', bottom: 0, left: 0, right: 0,
+                    paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 30 : 20, paddingTop: 12,
+                    backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+                    borderTopWidth: 1,
+                    borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+                }}>
+                    <Button
+                        onPress={handleSave}
+                        disabled={loading || !form.productName || !form.customerName || !form.vendorName}
+                        className="h-14"
+                    >
+                        {loading ? 'Saving...' : 'Save Order'}
+                    </Button>
+                </View>
                 <BottomSheetPicker
                     visible={statusPickerVisible}
                     onClose={() => setStatusPickerVisible(false)}

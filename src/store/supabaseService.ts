@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabase';
-import { Order, LedgerEntry, DirectoryItem, Transaction, calculateMargin, OrderStatus } from '../utils/types';
+import { Order, LedgerEntry, DirectoryItem, Transaction, calculateMargin, OrderStatus, Expense } from '../utils/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const USER_STORAGE_KEY = '@neetu_collection_user';
@@ -553,7 +553,8 @@ export const supabaseService = {
         if (options.refundFromShop && order.vendorId) {
             await supabase.from('ledger').insert([{
                 user_id: userId, person_id: order.vendorId, order_id: orderId,
-                amount: -order.originalPrice, transaction_type: 'PaymentIn', notes: 'Shop Refund (Cancel)'
+                amount: order.originalPrice, // Recovery of funds from vendor (reduces our debt, so positive)
+                transaction_type: 'PaymentIn', notes: 'Shop Refund (Cancel)'
             }]);
         }
     },
@@ -566,7 +567,8 @@ export const supabaseService = {
         if (returnFee > 0) {
             await supabase.from('ledger').insert([{
                 user_id: userId, person_id: order.customerId, order_id: orderId,
-                amount: -returnFee, transaction_type: 'Expense', notes: 'Order Return Fee'
+                amount: returnFee, // Fee charged to customer (increases their debt, so positive)
+                transaction_type: 'Expense', notes: 'Order Return Fee'
             }]);
         }
     },
@@ -722,7 +724,6 @@ export const supabaseService = {
         return (directoryData || []).map((item: any) => ({
             ...item,
             balance: (item.ledger || [])
-                .filter((l: any) => !l.is_settled)
                 .reduce((acc: number, l: any) => acc + Number(l.amount), 0),
             createdAt: new Date(item.created_at).getTime(),
             isActive: item.is_active
@@ -974,5 +975,75 @@ export const supabaseService = {
 
             await this.saveOrder(order, userId);
         }
+    },
+
+    // --- Expense Services ---
+    async getExpenses(userId: string): Promise<Expense[]> {
+        const { data, error } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error fetching expenses:', error);
+            return [];
+        }
+        return (data || []).map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            date: item.date,
+            title: item.title,
+            amount: Number(item.amount),
+            category: item.category || 'Other',
+            notes: item.notes,
+            createdAt: new Date(item.created_at).getTime(),
+        })) as Expense[];
+    },
+
+    async saveExpense(expense: Partial<Expense>, userId: string): Promise<void> {
+        const payload = {
+            user_id: userId,
+            date: expense.date,
+            title: expense.title,
+            amount: expense.amount,
+            category: expense.category || 'Other',
+            notes: expense.notes || null,
+        };
+        if (expense.id) {
+            const { error } = await supabase.from('expenses').update(payload).eq('id', expense.id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabase.from('expenses').insert([payload]);
+            if (error) throw error;
+        }
+    },
+
+    async deleteExpense(id: string): Promise<void> {
+        const { error } = await supabase.from('expenses').delete().eq('id', id);
+        if (error) throw error;
+    },
+
+    async getExpensesForPeriod(userId: string, startDate: Date, endDate: Date): Promise<Expense[]> {
+        const { data, error } = await supabase
+            .from('expenses')
+            .select('*')
+            .eq('user_id', userId)
+            .gte('created_at', startDate.toISOString())
+            .lte('created_at', endDate.toISOString())
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error fetching expenses for period:', error);
+            return [];
+        }
+        return (data || []).map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            date: item.date,
+            title: item.title,
+            amount: Number(item.amount),
+            category: item.category || 'Other',
+            notes: item.notes,
+            createdAt: new Date(item.created_at).getTime(),
+        })) as Expense[];
     },
 };

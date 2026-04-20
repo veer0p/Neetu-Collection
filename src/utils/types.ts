@@ -95,6 +95,19 @@ export interface DirectoryItem {
     isActive?: boolean;
 }
 
+export type ExpenseCategory = 'Rent' | 'Packaging' | 'Travel' | 'Courier' | 'Salary' | 'Other';
+
+export interface Expense {
+    id: string;
+    userId: string;
+    date: string;
+    title: string;
+    amount: number;
+    category: ExpenseCategory;
+    notes?: string;
+    createdAt: number;
+}
+
 export type Period = 'This Week' | 'This Month' | 'Last 3 Months' | 'Custom';
 
 export const calculateMargin = (original: number, selling: number, pickup: number = 0, shipping: number = 0) => {

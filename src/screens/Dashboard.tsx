@@ -8,7 +8,7 @@ import { useTransactions } from '../hooks/useTransactions';
 import { supabaseService } from '../store/supabaseService';
 import {
     AlertTriangle, ChevronRight, TrendingUp, TrendingDown,
-    ArrowUpRight, ArrowDownLeft, Wallet, BarChart3, Package,
+    ArrowUpRight, ArrowDownLeft, Wallet, BarChart3, Package, Receipt,
 } from 'lucide-react-native';
 import { cn } from '../utils/cn';
 import { useTheme } from '../context/ThemeContext';
@@ -27,6 +27,8 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
         thisWeekProfit: 0,
         lastWeekProfit: 0,
         thisMonthProfit: 0,
+        thisMonthExpenses: 0,
+        thisWeekExpenses: 0,
         totalOrders: 0,
         thisWeekOrders: 0,
         alerts: [] as { message: string }[],
@@ -39,9 +41,10 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
         if (!userId) return;
         setLoading(true);
         try {
-            const [directory, transactions] = await Promise.all([
+            const [directory, transactions, allExpenses] = await Promise.all([
                 supabaseService.getDirectoryWithBalances(userId),
                 supabaseService.getTransactions(userId),
+                supabaseService.getExpenses(userId),
             ]);
 
             const receivableAccounts = directory.filter((a: any) => a.balance > 0);
@@ -82,6 +85,17 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
             const lastWeekProfit = lastWeekOrders.reduce((s: number, t: any) => s + (Number(t.margin) || 0), 0);
             const thisMonthProfit = thisMonthOrders.reduce((s: number, t: any) => s + (Number(t.margin) || 0), 0);
 
+            // Calculate expenses for this month and this week
+            const thisMonthExpenses = allExpenses.filter((e: any) => {
+                const d = new Date(e.createdAt);
+                return d >= thisMonthStart;
+            }).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
+
+            const thisWeekExpenses = allExpenses.filter((e: any) => {
+                const d = new Date(e.createdAt);
+                return d >= thisWeekStart;
+            }).reduce((s: number, e: any) => s + (Number(e.amount) || 0), 0);
+
             // Alerts
             const alerts: { message: string }[] = [];
             const oldPending = activeTransactions.filter((t: any) => {
@@ -119,6 +133,8 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                 thisWeekProfit,
                 lastWeekProfit,
                 thisMonthProfit,
+                thisMonthExpenses,
+                thisWeekExpenses,
                 totalOrders: activeTransactions.length,
                 thisWeekOrders: thisWeekOrders.length,
                 alerts,
@@ -195,8 +211,15 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                                     </View>
                                 </View>
                                 <Text style={{ color: '#FFFFFF', fontSize: 44, fontFamily: 'PlusJakartaSans_800ExtraBold', marginBottom: 4, letterSpacing: -0.5 }}>
-                                    ₹{stats.thisMonthProfit.toLocaleString()}
+                                    ₹{(stats.thisMonthProfit - stats.thisMonthExpenses).toLocaleString()}
                                 </Text>
+                                {stats.thisMonthExpenses > 0 && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                                        <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium' }}>
+                                            Margin ₹{stats.thisMonthProfit.toLocaleString()}  −  Expenses ₹{stats.thisMonthExpenses.toLocaleString()}
+                                        </Text>
+                                    </View>
+                                )}
 
                                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
                                     {weekChange !== 0 && (
@@ -219,7 +242,7 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                                         </View>
                                     )}
                                     <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontFamily: 'PlusJakartaSans_500Medium' }}>
-                                        ₹{stats.thisWeekProfit.toLocaleString()} this week
+                                        ₹{(stats.thisWeekProfit - stats.thisWeekExpenses).toLocaleString()} this week
                                     </Text>
                                 </View>
                             </View>
@@ -400,6 +423,22 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                                                 <BarChart3 size={20} color={isDark ? '#FBBF24' : '#F59E0B'} />
                                             </View>
                                             <Text className="text-primary dark:text-primary-dark font-sans-semibold text-xs">Insights</Text>
+                                        </Card>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        onPress={() => navigation.navigate('Expenses')}
+                                        className="flex-1"
+                                        activeOpacity={0.7}
+                                    >
+                                        <Card className="p-4 items-center">
+                                            <View style={{
+                                                width: 44, height: 44, borderRadius: 14,
+                                                backgroundColor: isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)',
+                                                alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+                                            }}>
+                                                <Receipt size={20} color={isDark ? '#F87171' : '#EF4444'} />
+                                            </View>
+                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-xs">Expenses</Text>
                                         </Card>
                                     </TouchableOpacity>
                                 </View>

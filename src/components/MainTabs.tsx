@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Platform, Keyboard } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, ClipboardList, Plus, Wallet, Settings as SettingsIcon, BarChart3, Contact2, Calculator as CalculatorIcon, CalendarDays } from 'lucide-react-native';
+import { Home, ClipboardList, Plus, Wallet, Settings as SettingsIcon, BarChart3, Contact2, Calculator as CalculatorIcon, CalendarDays, Receipt } from 'lucide-react-native';
 import Dashboard from '../screens/Dashboard';
 import AddEntry from '../screens/AddEntry';
 import Transactions from '../screens/Transactions';
@@ -10,6 +10,7 @@ import Settings from '../screens/Settings';
 import Directory from '../screens/Directory';
 import Reports from '../screens/Reports';
 import Calculator from '../screens/Calculator';
+import Expenses from '../screens/Expenses';
 import Calendar from '../screens/Calendar';
 import { useTheme } from '../context/ThemeContext';
 import { cn } from '../utils/cn';
@@ -19,13 +20,14 @@ const Tab = createBottomTabNavigator();
 
 // ─── Nav Item Definitions ────────────────────────────────────────────────────
 
-type TabName = 'Home' | 'Orders' | 'Add' | 'Ledger' | 'Directory' | 'Insights' | 'Calculator' | 'Calendar' | 'Settings';
+type TabName = 'Home' | 'Orders' | 'Add' | 'Ledger' | 'Expenses' | 'Directory' | 'Insights' | 'Calculator' | 'Calendar' | 'Settings';
 
 const NAV_ITEMS: { name: TabName; label: string; Icon: any }[] = [
     { name: 'Home', label: 'Dashboard', Icon: Home },
     { name: 'Orders', label: 'Orders', Icon: ClipboardList },
     { name: 'Add', label: 'New Order', Icon: Plus },
     { name: 'Ledger', label: 'Ledger', Icon: Wallet },
+    { name: 'Expenses', label: 'Expenses', Icon: Receipt },
     { name: 'Directory', label: 'Directory', Icon: Contact2 },
     { name: 'Insights', label: 'Insights', Icon: BarChart3 },
     { name: 'Calculator', label: 'Calculator', Icon: CalculatorIcon },
@@ -80,6 +82,7 @@ const WebLayout = ({ user, onLogout, parentNavigation }: { user: any; onLogout: 
             case 'Orders': return s(Transactions);
             case 'Add': return s(AddEntry);
             case 'Ledger': return s(Ledger);
+            case 'Expenses': return s(Expenses);
             case 'Directory': return s(Directory);
             case 'Insights': return s(Reports);
             case 'Calculator': return s(Calculator);
@@ -170,6 +173,19 @@ const DOCK_WIDTH = SCREEN_WIDTH - (DOCK_MARGIN * 2);
 const MobileTabBar = ({ state, descriptors, navigation }: any) => {
     const { isDark } = useTheme();
     const scrollRef = useRef<ScrollView>(null);
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+    useEffect(() => {
+        const showSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+            () => setKeyboardVisible(true)
+        );
+        const hideSub = Keyboard.addListener(
+            Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+            () => setKeyboardVisible(false)
+        );
+        return () => { showSub.remove(); hideSub.remove(); };
+    }, []);
 
     const mainRoutes = state.routes.filter((r: any) => r.name !== 'Add');
     const pages = [];
@@ -184,6 +200,8 @@ const MobileTabBar = ({ state, descriptors, navigation }: any) => {
         const pageIndex = Math.floor(routeIndex / 4);
         scrollRef.current?.scrollTo({ x: pageIndex * DOCK_WIDTH, animated: true });
     }, [state.index, mainRoutes]);
+
+    if (keyboardVisible) return null;
 
     return (
         <View
@@ -285,6 +303,7 @@ const MobileNavigator = ({ user, onLogout }: { user: any; onLogout: () => void }
         </Tab.Screen>
         <Tab.Screen name="Orders" component={Transactions} options={{ tabBarIcon: ({ color, size }: any) => <ClipboardList color={color} size={size} /> }} />
         <Tab.Screen name="Ledger" component={Ledger} options={{ tabBarIcon: ({ color, size }: any) => <Wallet color={color} size={size} /> }} />
+        <Tab.Screen name="Expenses" component={Expenses} options={{ tabBarIcon: ({ color, size }: any) => <Receipt color={color} size={size} /> }} />
         <Tab.Screen name="Directory" component={Directory} options={{ tabBarIcon: ({ color, size }: any) => <Contact2 color={color} size={size} /> }} />
         <Tab.Screen name="Insights" component={Reports} options={{ tabBarIcon: ({ color, size }: any) => <BarChart3 color={color} size={size} /> }} />
         <Tab.Screen name="Calculator" component={Calculator} options={{ tabBarIcon: ({ color, size }: any) => <CalculatorIcon color={color} size={size} /> }} />

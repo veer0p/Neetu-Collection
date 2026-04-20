@@ -161,10 +161,10 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
         setLoading(true);
         const data = await supabaseService.getLedgerEntries(person.id);
 
-        // Net Balance: Sum of all UNSETTLED entries (representing actual outstanding dues)
-        const total = data
-            .filter((curr: any) => !curr.isSettled)
-            .reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        // Net Balance: Sum of all entries to maintain a correct running balance.
+        // We no longer filter by !isSettled because manual payments might partially settle orders
+        // and we need the full historical sum for an accurate net position.
+        const total = data.reduce((acc: number, curr: any) => acc + curr.amount, 0);
         setFullBalance(total);
 
         // For Vendor accounts: hide entries that are internally settled by driver
@@ -512,9 +512,14 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
                                         </View>
                                     );
                                 }
-                                // For Customers: Sale is Red (Debt), PaymentIn is Green (Reduction)
-                                // For Vendors/Pickup: Purchase/Expense is Red (Debt), PaymentIn/Out is Green (Reduction)
-                                const isDebtInc = person.type === 'Customer' ? item.transactionType === 'Sale' : ['Purchase', 'Expense'].includes(item.transactionType);
+                                // Debt-increasing transactions: 
+                                // For Customers: Sale, PaymentOut (Money to customer), Reversal (Refund to them) increases what they owe us.
+                                // For Vendors: Purchase, Expense, PaymentIn (Refund from them) increases our debt to them (makes balance more negative).
+                                const debtIncTypes = person.type === 'Customer'
+                                    ? ['Sale', 'PaymentOut', 'Reversal']
+                                    : ['Purchase', 'Expense', 'PaymentIn'];
+
+                                const isDebtInc = debtIncTypes.includes(item.transactionType);
                                 const isInflow = !isDebtInc;
                                 const isActionable = ['Sale', 'Purchase', 'Expense'].includes(item.transactionType);
 
