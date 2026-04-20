@@ -797,8 +797,8 @@ export const supabaseService = {
                 id: l.id,
                 date: l.created_at.split('T')[0], // Use creation date for ledger entries
                 type,
-                customerName: type === 'Payment' && l.amount > 0 ? l.person?.name : undefined,
-                vendorName: type === 'Payment' && l.amount < 0 ? l.person?.name : undefined,
+                customerName: (l.transaction_type === 'PaymentIn' || l.transaction_type === 'PaymentOut') && l.person?.type === 'Customer' ? l.person?.name : undefined,
+                vendorName: (l.transaction_type === 'PaymentIn' || l.transaction_type === 'PaymentOut') && l.person?.type === 'Vendor' ? l.person?.name : undefined,
                 productName: l.notes || 'Manual Entry',
                 amount: Math.abs(Number(l.amount)),
                 notes: l.notes,

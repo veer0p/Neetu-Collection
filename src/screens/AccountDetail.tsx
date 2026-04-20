@@ -238,7 +238,16 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
     const handleAddPayment = async () => {
         if (!userId || !paymentForm.amount) return;
         const amount = parseFloat(paymentForm.amount);
-        const finalAmount = paymentForm.type === 'PaymentIn' ? -amount : amount;
+        // Customer: PaymentIn (Receive) = Negative, PaymentOut (Refund) = Positive
+        // Vendor/Pickup: PaymentOut (Pay them) = Positive (reduces debt), PaymentIn (Refund from them) = Positive
+        // Note: For Vendors, balance is negative, so adding positive reduces absolute debt.
+        let finalAmount = paymentForm.type === 'PaymentIn' ? -amount : amount;
+
+        // Correcting for Vendor/Pickup: Receive (PaymentIn) should also be positive to reduce negative balance
+        if (person.type !== 'Customer' && paymentForm.type === 'PaymentIn') {
+            finalAmount = amount;
+        }
+
         await supabaseService.addPayment({
             personId: person.id, amount: finalAmount,
             transactionType: paymentForm.type, notes: paymentForm.notes
@@ -708,28 +717,28 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
                                             onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentIn' })}
                                             style={{
                                                 flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                                                backgroundColor: paymentForm.type === 'PaymentIn' ? '#10B981' : 'transparent',
+                                                backgroundColor: paymentForm.type === 'PaymentIn' ? (person.type === 'Customer' ? '#10B981' : '#F59E0B') : 'transparent',
                                             }}
                                         >
                                             <Text style={{
                                                 fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
                                                 color: paymentForm.type === 'PaymentIn' ? '#FFFFFF' : '#94A3B8',
                                             }}>
-                                                IN
+                                                {person.type === 'Customer' ? 'RECEIVE' : 'REFUND from them'}
                                             </Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity
                                             onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentOut' })}
                                             style={{
                                                 flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                                                backgroundColor: paymentForm.type === 'PaymentOut' ? '#EF4444' : 'transparent',
+                                                backgroundColor: paymentForm.type === 'PaymentOut' ? (person.type === 'Customer' ? '#EF4444' : '#10B981') : 'transparent',
                                             }}
                                         >
                                             <Text style={{
                                                 fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
                                                 color: paymentForm.type === 'PaymentOut' ? '#FFFFFF' : '#94A3B8',
                                             }}>
-                                                OUT
+                                                {person.type === 'Customer' ? 'REFUND to them' : 'PAY them'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
