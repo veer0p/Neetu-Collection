@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Home, ClipboardList, Plus, Wallet, Settings as SettingsIcon, BarChart3, Contact2, Calculator as CalculatorIcon, CalendarDays } from 'lucide-react-native';
 import Dashboard from '../screens/Dashboard';
@@ -131,8 +131,8 @@ const WebLayout = ({ user, onLogout, parentNavigation }: { user: any; onLogout: 
                                 paddingHorizontal: 10, paddingVertical: 10,
                                 borderRadius: 10, marginBottom: 4,
                                 backgroundColor: isFocused
-                                        ? (isDark ? 'rgba(129,140,248,0.12)' : 'rgba(79,70,229,0.08)')
-                                        : 'transparent',
+                                    ? (isDark ? 'rgba(129,140,248,0.12)' : 'rgba(79,70,229,0.08)')
+                                    : 'transparent',
                             }}
                         >
                             <Icon
@@ -186,15 +186,30 @@ const MobileTabBar = ({ state, descriptors, navigation }: any) => {
     }, [state.index, mainRoutes]);
 
     return (
-        <View style={{
-            position: 'absolute', bottom: 30, left: DOCK_MARGIN, right: DOCK_MARGIN, height: 64,
-            backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-            borderRadius: 32,
-            shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.15, shadowRadius: 20, elevation: 10,
-            overflow: 'hidden', borderWidth: 1.5,
-            borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
-        }}>
+        <View
+            style={{
+                position: 'absolute', bottom: 30, left: DOCK_MARGIN, right: DOCK_MARGIN, height: 64,
+                backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                borderRadius: 32,
+                elevation: 10,
+                overflow: 'hidden', borderWidth: 1.5,
+                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+            }}
+            // Move complex shadows to a non-conflicting structure for Android
+            {...Platform.select({
+                ios: {
+                    style: {
+                        position: 'absolute', bottom: 30, left: DOCK_MARGIN, right: DOCK_MARGIN, height: 64,
+                        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: 32,
+                        shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
+                        shadowOpacity: 0.15, shadowRadius: 20,
+                        overflow: 'hidden', borderWidth: 1.5,
+                        borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
+                    }
+                }
+            })}
+        >
             <ScrollView
                 ref={scrollRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
                 bounces={true} overScrollMode="never"
@@ -244,8 +259,14 @@ const MobileTabBar = ({ state, descriptors, navigation }: any) => {
             {/* Fixed Central Add Button */}
             <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' }}>
                 <TouchableOpacity onPress={() => navigation.navigate('Add')} activeOpacity={0.8}
-                    style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: isDark ? '#818CF8' : '#4F46E5', justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}>
-                    <Plus color="#FFFFFF" size={24} />
+                    style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: isDark ? '#818CF8' : '#4F46E5', justifyContent: 'center', alignItems: 'center', elevation: 4 }}>
+                    <View style={Platform.select({
+                        ios: {
+                            shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8
+                        }
+                    })}>
+                        <Plus color="#FFFFFF" size={24} />
+                    </View>
                 </TouchableOpacity>
             </View>
         </View>

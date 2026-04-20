@@ -44,7 +44,10 @@ export const ConfirmDialog = ({
     return (
         <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
             <View className="flex-1 bg-black/50 justify-center items-center px-6">
-                <View className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[32px] p-6 items-center shadow-xl">
+                <View
+                    className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[32px] p-6 items-center"
+                    style={{ elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.1, shadowRadius: 20 }}
+                >
                     <View className={cn(
                         "p-4 rounded-full mb-4",
                         isDanger ? 'bg-danger/10' : isSuccess ? 'bg-success/10' : 'bg-accent/10'

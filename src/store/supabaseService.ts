@@ -114,6 +114,9 @@ export const supabaseService = {
             pickupPaymentStatus: item.pickup_payment_status,
             notes: item.notes,
             statusHistory: item.status_history,
+            quantity: item.quantity || 1,
+            unitOriginalPrice: Number(item.unit_original_price || item.original_price),
+            unitSellingPrice: Number(item.unit_selling_price || item.selling_price),
             createdAt: new Date(item.created_at).getTime(),
         })) as Order[];
     },
@@ -162,13 +165,16 @@ export const supabaseService = {
             pickupPaymentStatus: data.pickup_payment_status,
             notes: data.notes,
             statusHistory: data.status_history,
+            quantity: data.quantity || 1,
+            unitOriginalPrice: Number(data.unit_original_price || data.original_price),
+            unitSellingPrice: Number(data.unit_selling_price || data.selling_price),
             createdAt: new Date(data.created_at).getTime(),
         } as Order;
     },
 
     async saveOrder(order: Partial<Order>, userId: string): Promise<void> {
         const isUpdate = !!order.id;
-        const margin = (order.sellingPrice || 0) - (order.originalPrice || 0) - (order.pickupCharges || 0) - (order.shippingCharges || 0);
+        const margin = (Number(order.sellingPrice) || 0) - (Number(order.originalPrice) || 0);
 
         let savedOrder;
         if (isUpdate) {
@@ -207,6 +213,9 @@ export const supabaseService = {
                 vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
                 customer_payment_status: order.customerPaymentStatus || 'Udhar',
                 pickup_payment_status: order.pickupPaymentStatus || 'Paid',
+                quantity: order.quantity || 1,
+                unit_original_price: order.unitOriginalPrice || order.originalPrice || 0,
+                unit_selling_price: order.unitSellingPrice || order.sellingPrice || 0,
                 margin,
             };
 
@@ -242,6 +251,9 @@ export const supabaseService = {
                 vendor_payment_status: order.vendorPaymentStatus || 'Udhar',
                 customer_payment_status: order.customerPaymentStatus || 'Udhar',
                 pickup_payment_status: order.pickupPaymentStatus || 'Paid',
+                quantity: order.quantity || 1,
+                unit_original_price: order.unitOriginalPrice || order.originalPrice || 0,
+                unit_selling_price: order.unitSellingPrice || order.sellingPrice || 0,
                 margin,
             };
 
@@ -268,10 +280,10 @@ export const supabaseService = {
         }
 
         const orderId = savedOrder.id;
-        const originalPrice = order.originalPrice || 0;
-        const sellingPrice = order.sellingPrice || 0;
-        const pickupCharges = order.pickupCharges || 0;
-        const shippingCharges = order.shippingCharges || 0;
+        const originalPrice = Number(order.originalPrice || 0);
+        const sellingPrice = Number(order.sellingPrice || 0);
+        const pickupCharges = Number(order.pickupCharges || 0);
+        const shippingCharges = Number(order.shippingCharges || 0);
 
         if (isCanceledOrReturned) {
             // Reversal Logic:
@@ -320,7 +332,7 @@ export const supabaseService = {
 
         ledgerEntries.push({
             user_id: userId, order_id: orderId, person_id: order.customerId || null,
-            amount: sellingPrice, transaction_type: 'Sale', is_settled: false,
+            amount: sellingPrice + shippingCharges + pickupCharges, transaction_type: 'Sale', is_settled: false,
         });
         ledgerEntries.push({
             user_id: userId, order_id: orderId, person_id: order.vendorId || null,
@@ -346,22 +358,23 @@ export const supabaseService = {
         }
         if (paidByDriver && hasPickupPerson) {
             // Driver paid the vendor directly — mark the vendor's Purchase as settled immediately
-            // (shop owner does not owe vendor; driver handled it)
-            const purchaseEntry = ledgerEntries.find((e: any) =>
-                e.transaction_type === 'Purchase' && e.person_id === (order.vendorId || null)
-            );
-            if (purchaseEntry) {
-                purchaseEntry.is_settled = true;
-                purchaseEntry.settled_at = new Date().toISOString();
-            }
-            // Also mark vendor shipping expense as settled (driver covered it)
             for (const e of ledgerEntries) {
-                if (e.person_id === (order.vendorId || null) && e.transaction_type === 'Expense') {
+                if (e.person_id === order.vendorId && (e.transaction_type === 'Purchase' || (e.transaction_type === 'Expense' && e.notes === 'Shipping charges'))) {
                     e.is_settled = true;
                     e.settled_at = new Date().toISOString();
                 }
             }
-            // Shop owner now owes driver the product cost — track as Expense on pickup person
+
+            // AND create balancing entry for Vendor so their balance becomes 0
+            // We use 'PaymentOut' because from shop perspective it's a payment made (even though via driver)
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
+                amount: originalPrice, transaction_type: 'PaymentOut',
+                notes: 'Paid by pickup person', is_settled: true,
+                settled_at: new Date().toISOString()
+            });
+
+            // Also record the debt to the Pickup Person (Reimbursement)
             if (originalPrice > 0) {
                 ledgerEntries.push({
                     user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
@@ -406,7 +419,7 @@ export const supabaseService = {
     async getLedgerEntries(personId: string): Promise<LedgerEntry[]> {
         const { data, error } = await supabase
             .from('ledger')
-            .select('*, order:orders(product:directory!product_id(name), status)')
+            .select('*, order:orders(product:directory!product_id(name), status, quantity)')
             .eq('person_id', personId)
             .order('created_at', { ascending: false });
 
@@ -415,6 +428,7 @@ export const supabaseService = {
             id: item.id, userId: item.user_id, orderId: item.order_id, personId: item.person_id,
             amount: Number(item.amount), transactionType: item.transaction_type as any, notes: item.notes,
             orderProductName: item.order?.product?.name, orderStatus: item.order?.status,
+            orderQuantity: item.order?.quantity,
             createdAt: new Date(item.created_at).getTime(),
             isSettled: item.is_settled ?? false,
             settledAt: item.settled_at ? new Date(item.settled_at).getTime() : undefined,
@@ -468,11 +482,13 @@ export const supabaseService = {
 
         if (unsettledOrders.length === 0) return;
 
-        let manualBalance = manualEntries.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
-
         // 3. FIFO Match: youngest payments vs oldest orders
         const toSettle: string[] = [];
         const orderIdsToUpdate: string[] = [];
+
+        // Track which manual entries to settle
+        const unsettledManual = manualEntries.filter(e => !e.is_settled);
+        let manualBalance = unsettledManual.reduce((sum: number, e: any) => sum + Number(e.amount), 0);
 
         for (const orderEntry of unsettledOrders) {
             const amount = Number(orderEntry.amount);
@@ -482,6 +498,12 @@ export const supabaseService = {
                     toSettle.push(orderEntry.id);
                     if (orderEntry.order_id) orderIdsToUpdate.push(orderEntry.order_id);
                     manualBalance += amount;
+
+                    // If balance exactly hits zero, we can likely settle the manual entries too
+                    // To be safe, we only mark manual entries as settled if the TOTAL manual balance is now zero
+                    if (manualBalance === 0) {
+                        unsettledManual.forEach(m => toSettle.push(m.id));
+                    }
                 } else {
                     // Insufficient balance to cover this entire order
                     break;
@@ -563,7 +585,7 @@ export const supabaseService = {
             let personId = '';
 
             if (field === 'customer') {
-                amount = -Number(fullOrder.selling_price); // PaymentIn (Customer pays us, reduces their debt)
+                amount = -(Number(fullOrder.selling_price) + Number(fullOrder.shipping_charges || 0) + Number(fullOrder.pickup_charges || 0)); // PaymentIn (Customer pays us)
                 type = 'PaymentIn';
                 personId = fullOrder.customer_id;
             } else if (field === 'vendor') {
@@ -695,11 +717,15 @@ export const supabaseService = {
 
     async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
         const { data: directoryData, error: directoryError } = await supabase
-            .from('directory').select('*, ledger:ledger(amount)').eq('user_id', userId);
+            .from('directory').select('*, ledger:ledger(amount, is_settled)').eq('user_id', userId).eq('is_active', true);
         if (directoryError) return [];
         return (directoryData || []).map((item: any) => ({
-            ...item, balance: (item.ledger || []).reduce((acc: number, l: any) => acc + Number(l.amount), 0),
-            createdAt: new Date(item.created_at).getTime()
+            ...item,
+            balance: (item.ledger || [])
+                .filter((l: any) => !l.is_settled)
+                .reduce((acc: number, l: any) => acc + Number(l.amount), 0),
+            createdAt: new Date(item.created_at).getTime(),
+            isActive: item.is_active
         })) as DirectoryItem[];
     },
 
@@ -748,6 +774,9 @@ export const supabaseService = {
                 status: o.status,
                 notes: o.notes,
                 statusHistory: o.status_history,
+                quantity: o.quantity || 1,
+                unitOriginalPrice: Number(o.unit_original_price || o.original_price),
+                unitSellingPrice: Number(o.unit_selling_price || o.selling_price),
                 createdAt: new Date(o.created_at).getTime(),
             };
         });
@@ -781,14 +810,23 @@ export const supabaseService = {
     },
 
     async getDirectory(userId: string): Promise<DirectoryItem[]> {
-        const { data, error } = await supabase.from('directory').select('*').eq('user_id', userId).order('name');
+        const { data, error } = await supabase.from('directory').select('*').eq('user_id', userId).eq('is_active', true).order('name');
         if (error) return [];
-        return (data || []).map((item: any) => ({ ...item, createdAt: new Date(item.created_at).getTime() })) as DirectoryItem[];
+        return (data || []).map((item: any) => ({
+            ...item,
+            createdAt: new Date(item.created_at).getTime(),
+            isActive: item.is_active
+        })) as DirectoryItem[];
     },
 
     async saveDirectoryItem(item: Partial<DirectoryItem>, userId: string): Promise<void> {
         const payload = { user_id: userId, name: item.name, type: item.type, address: item.address, phone: item.phone };
         const { error } = item.id ? await supabase.from('directory').update(payload).eq('id', item.id) : await supabase.from('directory').insert([payload]);
+        if (error) throw error;
+    },
+
+    async softDeleteDirectoryItem(id: string): Promise<void> {
+        const { error } = await supabase.from('directory').update({ is_active: false }).eq('id', id);
         if (error) throw error;
     },
 
@@ -820,9 +858,13 @@ export const supabaseService = {
             originalPrice: Number(order.original_price), sellingPrice: Number(order.selling_price), margin: Number(order.margin),
             paidByDriver: order.paid_by_driver, pickupPersonId: order.pickup_person_id, pickupPersonName: order.pickup_person?.name,
             trackingId: order.tracking_id, courierName: order.courier_name, pickupCharges: Number(order.pickup_charges), shippingCharges: Number(order.shipping_charges),
-            status: status as any, notes: order.notes, customerPaymentStatus: order.customer_payment_status, vendorPaymentStatus: order.vendor_payment_status,
+            status: status as any,
+            notes: order.notes, customerPaymentStatus: order.customer_payment_status, vendorPaymentStatus: order.vendor_payment_status,
             pickupPaymentStatus: order.pickup_payment_status,
             statusHistory: newHistory,
+            quantity: order.quantity || 1,
+            unitOriginalPrice: Number(order.unit_original_price || order.original_price),
+            unitSellingPrice: Number(order.unit_selling_price || order.selling_price),
             createdAt: new Date(order.created_at).getTime(),
         };
         await this.saveOrder(orderData, order.user_id);

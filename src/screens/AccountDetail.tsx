@@ -98,7 +98,7 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
 
             // 2. Filter by Type
             if (shareType === 'Udhar') {
-                dataToShare = dataToShare.filter(e => e.transactionType !== 'PaymentIn' && e.transactionType !== 'PaymentOut' && !e.isSettled);
+                dataToShare = dataToShare.filter(e => !e.isSettled);
             }
 
             // Sort by date ascending for PDF
@@ -119,7 +119,8 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
                 dataToShare,
                 currentUserProfile?.upi_id,
                 'Neetu Collection',
-                shareType === 'Udhar'
+                shareType === 'Udhar',
+                person.type as any
             );
             setShareModalVisible(false);
         } catch (e) {
@@ -160,20 +161,17 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
         setLoading(true);
         const data = await supabaseService.getLedgerEntries(person.id);
 
-        // Net Balance: Sum of all entries (ignoring isSettled for balance integrity)
-        const total = data.reduce((acc: number, curr: any) => acc + curr.amount, 0);
+        // Net Balance: Sum of all UNSETTLED entries (representing actual outstanding dues)
+        const total = data
+            .filter((curr: any) => !curr.isSettled)
+            .reduce((acc: number, curr: any) => acc + curr.amount, 0);
         setFullBalance(total);
 
         // For Vendor accounts: hide entries that are internally settled by driver
         // (PaymentOut entries with "Paid by driver" notes are intermediary bookkeeping)
         // For Pickup Person accounts: show all entries (they need full visibility)
-        const filteredData = data.filter((entry: any) => {
-            // Hide "Paid by driver" PaymentOut from vendor view — this was settled by pickup person, not shop owner directly
-            if (person.type === 'Vendor' && entry.transactionType === 'PaymentOut' && entry.notes === 'Paid by driver') {
-                return false;
-            }
-            return true;
-        });
+        // For all accounts, show all entries for full transparency
+        const filteredData = data;
         setLedger(filteredData);
         setLoading(false);
     };
@@ -391,574 +389,575 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
-                {/* Header */}
-                {selectionMode ? (
-                    <View className="px-6 pt-4 pb-2 flex-row items-center bg-accent/10">
-                        <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="p-2 mr-3">
-                            <X color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
-                        </TouchableOpacity>
-                        <Text className="flex-1 text-primary dark:text-primary-dark font-sans-bold text-lg">
-                            {selectedIds.size} Selected
-                        </Text>
-                    </View>
-                ) : (
-                    <View className="px-6 pt-4 pb-2 flex-row items-center">
-                        <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
-                            <ArrowLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
-                        </TouchableOpacity>
-                        <View className="flex-1">
-                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{person.name}</Text>
-                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{person.type}</Text>
-                        </View>
-                        <TouchableOpacity
-                            onPress={() => setShareModalVisible(true)}
-                            className="bg-surface dark:bg-surface-dark px-3 py-2 rounded-full mr-2 border border-divider dark:border-divider-dark"
-                        >
-                            <Share2 color={isDark ? '#818CF8' : '#4F46E5'} size={18} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => {
-                                setPaymentForm({ ...paymentForm, type: person.type === 'Customer' ? 'PaymentIn' : 'PaymentOut' });
-                                setModalVisible(true);
-                            }}
-                            className="bg-accent px-4 py-2 rounded-full flex-row items-center"
-                        >
-                            <Plus color="white" size={16} />
-                            <Text className="text-white font-sans-bold text-xs ml-1">Pay</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Balance */}
-                <View className="px-6 py-4">
-                    <Card className="p-5 items-center">
-                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-wider mb-1">Current Balance</Text>
-                        <Text className={cn(
-                            "text-4xl font-sans-bold",
-                            fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-primary dark:text-primary-dark"
-                        )}>
-                            ₹{Math.abs(fullBalance).toLocaleString()}
-                        </Text>
-                        <Text className={cn("font-sans-semibold text-xs mt-1",
-                            fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-secondary dark:text-secondary-dark"
-                        )}>
-                            {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled "}
-                        </Text>
-                    </Card>
-                </View>
-
-                {/* Tabs - Horizontal Scroll Filters */}
-                <View className="-mx-6 mb-3">
-                    <ScrollView
-                        horizontal={true}
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 4, gap: 10 }}
-                    >
-                        {filterTypes.map(t => (
-                            <TouchableOpacity
-                                key={t}
-                                onPress={() => setTypeFilter(t)}
-                                style={{
-                                    paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16, borderWidth: 1,
-                                    backgroundColor: typeFilter === t ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
-                                    borderColor: typeFilter === t ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
-                                }}
-                            >
-                                <Text style={{
-                                    fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10,
-                                    textTransform: 'uppercase', letterSpacing: 1.5,
-                                    color: typeFilter === t ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
-                                }}>
-                                    {t}
-                                </Text>
+                    {/* Header */}
+                    {selectionMode ? (
+                        <View className="px-6 pt-4 pb-2 flex-row items-center bg-accent/10">
+                            <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="p-2 mr-3">
+                                <X color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
                             </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
+                            <Text className="flex-1 text-primary dark:text-primary-dark font-sans-bold text-lg">
+                                {selectedIds.size} Selected
+                            </Text>
+                        </View>
+                    ) : (
+                        <View className="px-6 pt-4 pb-2 flex-row items-center">
+                            <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
+                                <ArrowLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
+                            </TouchableOpacity>
+                            <View className="flex-1">
+                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{person.name}</Text>
+                                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{person.type}</Text>
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => setShareModalVisible(true)}
+                                className="bg-surface dark:bg-surface-dark px-3 py-2 rounded-full mr-2 border border-divider dark:border-divider-dark"
+                            >
+                                <Share2 color={isDark ? '#818CF8' : '#4F46E5'} size={18} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setPaymentForm({ ...paymentForm, type: person.type === 'Customer' ? 'PaymentIn' : 'PaymentOut' });
+                                    setModalVisible(true);
+                                }}
+                                className="bg-accent px-4 py-2 rounded-full flex-row items-center"
+                            >
+                                <Plus color="white" size={16} />
+                                <Text className="text-white font-sans-bold text-xs ml-1">Pay</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
 
-                {/* Ledger List */}
-                {loading ? (
-                    <View className="flex-1 justify-center items-center"><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" /></View>
-                ) : (
-                    <FlatList
-                        data={(() => {
-                            const filtered = ledger.filter(e => typeFilter === 'All' || e.transactionType === typeFilter);
-                            // Insert Date Headers into the flat list for selection
-                            const result: any[] = [];
-                            let lastDate = '';
-                            filtered.forEach(item => {
-                                const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown';
-                                if (dateStr !== lastDate) {
-                                    result.push({ isHeader: true, dateStr, originalDate: item.createdAt });
-                                    lastDate = dateStr;
-                                }
-                                result.push(item);
-                            });
-                            return result;
-                        })()}
-                        keyExtractor={(item, index) => item.isHeader ? `header-${item.dateStr}` : item.id}
-                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
-                        renderItem={({ item, index }) => {
-                            if (item.isHeader) {
-                                return (
-                                    <View className="flex-row items-center py-4 mt-2">
-                                        <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-widest">{item.dateStr}</Text>
-                                        {selectionMode && (
-                                            <TouchableOpacity
-                                                onPress={() => toggleDateSelection(new Date(item.originalDate).toLocaleDateString())}
-                                                className="px-3 py-1 bg-accent/10 rounded-lg border border-accent/20"
-                                            >
-                                                <Text className="text-accent font-sans-bold text-[10px]">Select Date</Text>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
-                                );
-                            }
-                            // Inflow = money coming into our "pocket" (Sales or customer payments)
-                            // Outflow = money going out of our "pocket" (Purchases, expenses, or payments to vendors)
-                            const isInflow = ['Sale', 'PaymentIn'].includes(item.transactionType);
-                            const isActionable = ['Sale', 'Purchase', 'Expense'].includes(item.transactionType);
+                    {/* Balance */}
+                    <View className="px-6 py-4">
+                        <Card className="p-5 items-center">
+                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-wider mb-1">Current Balance</Text>
+                            <Text className={cn(
+                                "text-4xl font-sans-bold",
+                                fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-primary dark:text-primary-dark"
+                            )}>
+                                ₹{Math.abs(fullBalance).toLocaleString()}
+                            </Text>
+                            <Text className={cn("font-sans-semibold text-xs mt-1",
+                                fullBalance > 0 ? "text-success" : fullBalance < 0 ? "text-danger" : "text-secondary dark:text-secondary-dark"
+                            )}>
+                                {fullBalance > 0 ? "You are owed" : fullBalance < 0 ? "You owe" : "Settled "}
+                            </Text>
+                        </Card>
+                    </View>
 
-                            // Only order-linked entries use the "isSettled" flag to hide from balance.
-                            // Manual entries are always considered part of the active running history.
-                            const alreadySettled = isActionable && item.orderId && (item.isSettled === true);
-                            const isCanceled = item.orderStatus === 'Canceled';
-
-                            // Time display: for settled entries show payment time; for others show entry creation time
-                            const displayTime = alreadySettled && item.settledAt ? item.settledAt : item.createdAt;
-
-                            const selectionId = item.orderId ? `order:${item.orderId}` : `entry:${item.id}`;
-                            const isSelected = selectedIds.has(selectionId);
-
-                            return (
+                    {/* Tabs - Horizontal Scroll Filters */}
+                    <View className="-mx-6 mb-3">
+                        <ScrollView
+                            horizontal={true}
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 4, gap: 10 }}
+                        >
+                            {filterTypes.map(t => (
                                 <TouchableOpacity
-                                    onPress={() => handleEntryPress(item)}
-                                    onLongPress={() => handleLongPress(item)}
-                                    activeOpacity={0.6}
+                                    key={t}
+                                    onPress={() => setTypeFilter(t)}
                                     style={{
-                                        flexDirection: 'row', alignItems: 'center',
-                                        paddingVertical: 14,
-                                        borderTopWidth: index > 0 ? 1 : 0,
-                                        borderTopColor: isDark ? '#1E293B' : '#F1F5F9',
-                                        backgroundColor: selectionMode && isSelected ? (isDark ? 'rgba(129,140,248,0.1)' : 'rgba(79,70,229,0.05)') : 'transparent',
-                                        paddingHorizontal: selectionMode ? 12 : 0,
-                                        marginHorizontal: selectionMode ? -12 : 0,
-                                        borderRadius: 12,
+                                        paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16, borderWidth: 1,
+                                        backgroundColor: typeFilter === t ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
+                                        borderColor: typeFilter === t ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
                                     }}
                                 >
-                                    {/* Selection Checkbox */}
-                                    {
-                                        selectionMode && (
-                                            <View className="mr-3">
-                                                {selectedIds.has(selectionId) ? (
-                                                    <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
-                                                        <Check color="white" size={12} strokeWidth={3} />
-                                                    </View>
-                                                ) : (
-                                                    <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
-                                                )}
-                                            </View>
-                                        )
-                                    }
-
-                                    {/* Left icon */}
-                                    <View style={{
-                                        width: 38, height: 38, borderRadius: 10,
-                                        backgroundColor: isInflow ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
-                                        alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                                    <Text style={{
+                                        fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10,
+                                        textTransform: 'uppercase', letterSpacing: 1.5,
+                                        color: typeFilter === t ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
                                     }}>
-                                        {isInflow
-                                            ? <TrendingUp size={18} color="#10B981" />
-                                            : <TrendingDown size={18} color="#EF4444" />
-                                        }
-                                    </View>
+                                        {t}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
 
-                                    {/* Center: type + sub-line (product/notes + date + status) */}
-                                    <View style={{ flex: 1 }}>
-                                        {/* Line 1: transaction type */}
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_600SemiBold',
-                                            fontSize: 13,
-                                            color: isDark ? '#F1F5F9' : '#0F172A',
-                                        }} numberOfLines={1}>
-                                            {item.transactionType}
-                                            {item.orderId && item.orderProductName ? (
-                                                <Text style={{
-                                                    fontFamily: 'PlusJakartaSans_400Regular',
-                                                    fontSize: 12,
-                                                    color: isDark ? '#818CF8' : '#4F46E5',
-                                                }}> · {item.orderProductName}</Text>
-                                            ) : null}
-                                        </Text>
-
-                                        {/* Line 2: date + time + status pill or action button (all inline) */}
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
-                                            <Text style={{
-                                                fontFamily: 'PlusJakartaSans_400Regular',
-                                                fontSize: 11,
-                                                color: isDark ? '#64748B' : '#94A3B8',
-                                            }}>
-                                                {new Date(displayTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                                {' '}
-                                                <Text style={{ fontSize: 10 }}>
-                                                    {new Date(displayTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                </Text>
-                                            </Text>
-
-                                            {item.notes && !item.orderId ? (
-                                                <Text style={{
-                                                    fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11,
-                                                    color: isDark ? '#64748B' : '#94A3B8',
-                                                }} numberOfLines={1}>· {item.notes}</Text>
-                                            ) : null}
-
-                                            {/* Status or action — inline */}
-                                            {isActionable && isCanceled && (
-                                                <View style={{
-                                                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-                                                    backgroundColor: 'rgba(239,68,68,0.10)',
-                                                }}>
-                                                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#EF4444', letterSpacing: 0.4 }}>
-                                                        CANCELED
-                                                    </Text>
-                                                </View>
-                                            )}
-
-                                            {isActionable && !isCanceled && alreadySettled && (
-                                                <View style={{
-                                                    flexDirection: 'row', alignItems: 'center', gap: 3,
-                                                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-                                                    backgroundColor: 'rgba(16,185,129,0.10)',
-                                                }}>
-                                                    <View style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: '#10B981' }} />
-                                                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#10B981', letterSpacing: 0.4 }}>
-                                                        SETTLED
-                                                    </Text>
-                                                </View>
-                                            )}
-
-                                            {isActionable && !isCanceled && !alreadySettled && (
+                    {/* Ledger List */}
+                    {loading ? (
+                        <View className="flex-1 justify-center items-center"><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} size="large" /></View>
+                    ) : (
+                        <FlatList
+                            data={(() => {
+                                const filtered = ledger.filter(e => typeFilter === 'All' || e.transactionType === typeFilter);
+                                // Insert Date Headers into the flat list for selection
+                                const result: any[] = [];
+                                let lastDate = '';
+                                filtered.forEach(item => {
+                                    const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown';
+                                    if (dateStr !== lastDate) {
+                                        result.push({ isHeader: true, dateStr, originalDate: item.createdAt });
+                                        lastDate = dateStr;
+                                    }
+                                    result.push(item);
+                                });
+                                return result;
+                            })()}
+                            keyExtractor={(item, index) => item.isHeader ? `header-${item.dateStr}` : item.id}
+                            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
+                            renderItem={({ item, index }) => {
+                                if (item.isHeader) {
+                                    return (
+                                        <View className="flex-row items-center py-4 mt-2">
+                                            <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-widest">{item.dateStr}</Text>
+                                            {selectionMode && (
                                                 <TouchableOpacity
-                                                    onPress={(e) => { e.stopPropagation(); handleQuickSettle(item); }}
-                                                    activeOpacity={0.75}
-                                                    style={{
-                                                        flexDirection: 'row', alignItems: 'center', gap: 4,
-                                                        paddingHorizontal: 8, paddingVertical: 3,
-                                                        borderRadius: 6, borderWidth: 1,
-                                                        borderColor: isInflow ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)',
-                                                        backgroundColor: isInflow ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
-                                                    }}
+                                                    onPress={() => toggleDateSelection(new Date(item.originalDate).toLocaleDateString())}
+                                                    className="px-3 py-1 bg-accent/10 rounded-lg border border-accent/20"
                                                 >
-                                                    <Text style={{
-                                                        fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, letterSpacing: 0.2,
-                                                        color: isInflow ? '#10B981' : '#F59E0B',
-                                                    }}>
-                                                        {isInflow ? 'Mark Received' : 'Mark Paid'}
-                                                    </Text>
+                                                    <Text className="text-accent font-sans-bold text-[10px]">Select Date</Text>
                                                 </TouchableOpacity>
                                             )}
                                         </View>
-                                    </View>
+                                    );
+                                }
+                                // For Customers: Sale is Red (Debt), PaymentIn is Green (Reduction)
+                                // For Vendors/Pickup: Purchase/Expense is Red (Debt), PaymentIn/Out is Green (Reduction)
+                                const isDebtInc = person.type === 'Customer' ? item.transactionType === 'Sale' : ['Purchase', 'Expense'].includes(item.transactionType);
+                                const isInflow = !isDebtInc;
+                                const isActionable = ['Sale', 'Purchase', 'Expense'].includes(item.transactionType);
 
-                                    {/* Right: amount */}
-                                    <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15,
-                                            color: isInflow ? '#10B981' : '#EF4444',
+                                // Only order-linked entries use the "isSettled" flag to hide from balance.
+                                // Manual entries are always considered part of the active running history.
+                                const alreadySettled = isActionable && item.orderId && (item.isSettled === true);
+                                const isCanceled = item.orderStatus === 'Canceled';
+
+                                // Time display: for settled entries show payment time; for others show entry creation time
+                                const displayTime = alreadySettled && item.settledAt ? item.settledAt : item.createdAt;
+
+                                const selectionId = item.orderId ? `order:${item.orderId}` : `entry:${item.id}`;
+                                const isSelected = selectedIds.has(selectionId);
+
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => handleEntryPress(item)}
+                                        onLongPress={() => handleLongPress(item)}
+                                        activeOpacity={0.6}
+                                        style={{
+                                            flexDirection: 'row', alignItems: 'center',
+                                            paddingVertical: 14,
+                                            borderTopWidth: index > 0 ? 1 : 0,
+                                            borderTopColor: isDark ? '#1E293B' : '#F1F5F9',
+                                            backgroundColor: selectionMode && isSelected ? (isDark ? 'rgba(129,140,248,0.1)' : 'rgba(79,70,229,0.05)') : 'transparent',
+                                            paddingHorizontal: selectionMode ? 12 : 0,
+                                            marginHorizontal: selectionMode ? -12 : 0,
+                                            borderRadius: 12,
+                                        }}
+                                    >
+                                        {/* Selection Checkbox */}
+                                        {
+                                            selectionMode && (
+                                                <View className="mr-3">
+                                                    {selectedIds.has(selectionId) ? (
+                                                        <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
+                                                            <Check color="white" size={12} strokeWidth={3} />
+                                                        </View>
+                                                    ) : (
+                                                        <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
+                                                    )}
+                                                </View>
+                                            )
+                                        }
+
+                                        {/* Left icon */}
+                                        <View style={{
+                                            width: 38, height: 38, borderRadius: 10,
+                                            backgroundColor: isInflow ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
+                                            alignItems: 'center', justifyContent: 'center', marginRight: 12,
                                         }}>
-                                            {isInflow ? '+' : '-'}₹{Math.abs(item.amount).toLocaleString()}
-                                        </Text>
-                                        <View style={{ marginTop: 4 }}>
-                                            {item.orderId ? (
-                                                <Lock size={11} color={isDark ? '#475569' : '#CBD5E1'} style={{ opacity: 0.4 }} />
-                                            ) : (
-                                                <View style={{ width: 11, height: 11 }} />
-                                            )}
+                                            {isInflow
+                                                ? <TrendingUp size={18} color="#10B981" />
+                                                : <TrendingDown size={18} color="#EF4444" />
+                                            }
                                         </View>
+
+                                        {/* Center: type + sub-line (product/notes + date + status) */}
+                                        <View style={{ flex: 1 }}>
+                                            {/* Line 1: transaction type */}
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_600SemiBold',
+                                                fontSize: 13,
+                                                color: isDark ? '#F1F5F9' : '#0F172A',
+                                            }} numberOfLines={1}>
+                                                {item.transactionType}
+                                                {item.orderId && item.orderProductName ? (
+                                                    <Text style={{
+                                                        fontFamily: 'PlusJakartaSans_400Regular',
+                                                        fontSize: 12,
+                                                        color: isDark ? '#818CF8' : '#4F46E5',
+                                                    }}> · {item.orderProductName}{item.orderQuantity ? ` (x${item.orderQuantity})` : ''}</Text>
+                                                ) : null}
+                                            </Text>
+
+                                            {/* Line 2: date + time + status pill or action button (all inline) */}
+                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                                                <Text style={{
+                                                    fontFamily: 'PlusJakartaSans_400Regular',
+                                                    fontSize: 11,
+                                                    color: isDark ? '#64748B' : '#94A3B8',
+                                                }}>
+                                                    {new Date(displayTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                    {' '}
+                                                    <Text style={{ fontSize: 10 }}>
+                                                        {new Date(displayTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                                    </Text>
+                                                </Text>
+
+                                                {item.notes && !item.orderId ? (
+                                                    <Text style={{
+                                                        fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11,
+                                                        color: isDark ? '#64748B' : '#94A3B8',
+                                                    }} numberOfLines={1}>· {item.notes}</Text>
+                                                ) : null}
+
+                                                {/* Status or action — inline */}
+                                                {isActionable && isCanceled && (
+                                                    <View style={{
+                                                        paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                                                        backgroundColor: 'rgba(239,68,68,0.10)',
+                                                    }}>
+                                                        <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#EF4444', letterSpacing: 0.4 }}>
+                                                            CANCELED
+                                                        </Text>
+                                                    </View>
+                                                )}
+
+                                                {isActionable && !isCanceled && alreadySettled && (
+                                                    <View style={{
+                                                        flexDirection: 'row', alignItems: 'center', gap: 3,
+                                                        paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                                                        backgroundColor: 'rgba(16,185,129,0.10)',
+                                                    }}>
+                                                        <View style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: '#10B981' }} />
+                                                        <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#10B981', letterSpacing: 0.4 }}>
+                                                            SETTLED
+                                                        </Text>
+                                                    </View>
+                                                )}
+
+                                                {isActionable && !isCanceled && !alreadySettled && (
+                                                    <TouchableOpacity
+                                                        onPress={(e) => { e.stopPropagation(); handleQuickSettle(item); }}
+                                                        activeOpacity={0.75}
+                                                        style={{
+                                                            flexDirection: 'row', alignItems: 'center', gap: 4,
+                                                            paddingHorizontal: 8, paddingVertical: 3,
+                                                            borderRadius: 6, borderWidth: 1,
+                                                            borderColor: isInflow ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)',
+                                                            backgroundColor: isInflow ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+                                                        }}
+                                                    >
+                                                        <Text style={{
+                                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, letterSpacing: 0.2,
+                                                            color: isInflow ? '#10B981' : '#F59E0B',
+                                                        }}>
+                                                            {isInflow ? 'Mark Received' : 'Mark Paid'}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
+                                        </View>
+
+                                        {/* Right: amount */}
+                                        <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15,
+                                                color: isInflow ? '#10B981' : '#EF4444',
+                                            }}>
+                                                {isInflow ? '+' : '-'}₹{Math.abs(item.amount).toLocaleString()}
+                                            </Text>
+                                            <View style={{ marginTop: 4 }}>
+                                                {item.orderId ? (
+                                                    <Lock size={11} color={isDark ? '#475569' : '#CBD5E1'} style={{ opacity: 0.4 }} />
+                                                ) : (
+                                                    <View style={{ width: 11, height: 11 }} />
+                                                )}
+                                            </View>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            }}
+
+                            ListEmptyComponent={
+                                <View className="items-center py-20">
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">No transactions</Text>
+                                </View>
+                            }
+                        />
+                    )}
+
+                    {/* Modals */}
+                    <Modal visible={modalVisible} animationType="slide" transparent>
+                        <View className="flex-1 justify-end bg-black/40">
+                            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setModalVisible(false)} />
+                            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                                <View className="bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-8">
+                                    <View className="items-center mb-6">
+                                        <View className="w-12 h-1.5 bg-divider dark:bg-divider-dark rounded-full mb-6" />
+                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">Record Payment</Text>
                                     </View>
-                                </TouchableOpacity>
-                            );
-                        }}
 
-                        ListEmptyComponent={
-                            <View className="items-center py-20">
-                                <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">No transactions</Text>
-                            </View>
-                        }
-                    />
-                )}
+                                    <View className="flex-row mb-6 bg-surface dark:bg-background-dark p-1 rounded-2xl border border-divider dark:border-divider-dark">
+                                        <TouchableOpacity
+                                            onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentIn' })}
+                                            style={{
+                                                flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+                                                backgroundColor: paymentForm.type === 'PaymentIn' ? '#10B981' : 'transparent',
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
+                                                color: paymentForm.type === 'PaymentIn' ? '#FFFFFF' : '#94A3B8',
+                                            }}>
+                                                IN
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentOut' })}
+                                            style={{
+                                                flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+                                                backgroundColor: paymentForm.type === 'PaymentOut' ? '#EF4444' : 'transparent',
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
+                                                color: paymentForm.type === 'PaymentOut' ? '#FFFFFF' : '#94A3B8',
+                                            }}>
+                                                OUT
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
 
-                {/* Modals */}
-                <Modal visible={modalVisible} animationType="slide" transparent>
-                    <View className="flex-1 justify-end bg-black/40">
-                        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setModalVisible(false)} />
-                        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-                            <View className="bg-white dark:bg-surface-dark rounded-t-3xl p-6 pb-8">
-                                <View className="items-center mb-6">
-                                    <View className="w-12 h-1.5 bg-divider dark:bg-divider-dark rounded-full mb-6" />
-                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">Record Payment</Text>
+                                    <Input
+                                        label="Amount (₹)"
+                                        placeholder="0.00"
+                                        keyboardType="numeric"
+                                        value={paymentForm.amount}
+                                        onChangeText={text => setPaymentForm({ ...paymentForm, amount: text })}
+                                    />
+                                    <Input
+                                        label="Notes"
+                                        placeholder="Add notes..."
+                                        value={paymentForm.notes}
+                                        onChangeText={text => setPaymentForm({ ...paymentForm, notes: text })}
+                                    />
+
+                                    <Button
+                                        onPress={handleAddPayment}
+                                        className="mt-4"
+                                        variant={paymentForm.type === 'PaymentIn' ? 'primary' : 'danger'}
+                                    >
+                                        <Text className="text-white font-sans-bold">Confirm Payment</Text>
+                                    </Button>
+                                </View>
+                            </KeyboardAvoidingView>
+                        </View>
+                    </Modal>
+
+                    {/* Edit Note Modal */}
+                    <Modal visible={editModalVisible} transparent animationType="fade">
+                        <View className="flex-1 justify-center bg-black/40 px-6">
+                            <Card className="p-6">
+                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-lg mb-4">Edit Note</Text>
+                                <Input placeholder="Add notes..." value={editNotes} onChangeText={setEditNotes} multiline />
+                                <View className="flex-row gap-3 mt-6">
+                                    <Button variant="secondary" onPress={() => setEditModalVisible(false)} className="flex-1">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans-bold">Cancel</Text>
+                                    </Button>
+                                    <Button onPress={handleUpdateNotes} className="flex-1">
+                                        <Text className="text-white font-sans-bold">Save</Text>
+                                    </Button>
+                                </View>
+                            </Card>
+                        </View>
+                    </Modal>
+
+                    {/* Order Preview Modal */}
+                    <Modal visible={orderModalVisible} transparent animationType="fade">
+                        <View className="flex-1 justify-center bg-black/40 px-6">
+                            <Card className="p-6">
+                                <View className="flex-row justify-between items-start mb-4">
+                                    <View>
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase mb-1">Order Transaction</Text>
+                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{selectedEntry?.orderProductName}</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setOrderModalVisible(false)} className="p-2 bg-surface dark:bg-surface-dark rounded-full">
+                                        <X size={18} color={isDark ? '#94A3B8' : '#9CA3AF'} />
+                                    </TouchableOpacity>
+                                </View>
+                                <View className="gap-2 mb-6">
+                                    <View className="flex-row justify-between p-3 bg-background dark:bg-background-dark rounded-xl">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">Type</Text>
+                                        <Text className="text-accent font-sans-bold text-sm">{selectedEntry?.transactionType}</Text>
+                                    </View>
+                                    <View className="flex-row justify-between p-3 bg-background dark:bg-background-dark rounded-xl">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">Amount</Text>
+                                        <Text className={cn("font-sans-bold text-lg",
+                                            ['Sale', 'PaymentIn'].includes(selectedEntry?.transactionType || '') ? "text-success" : "text-danger"
+                                        )}>
+                                            {['Sale', 'PaymentIn'].includes(selectedEntry?.transactionType || '') ? '+' : '-'}
+                                            ₹{Math.abs(selectedEntry?.amount || 0).toLocaleString()}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <Button variant="secondary" onPress={() => setOrderModalVisible(false)} className="w-full">
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans-bold">Close</Text>
+                                </Button>
+                            </Card>
+                        </View>
+                    </Modal>
+
+                    {/* Bulk Action Footer */}
+                    {selectionMode && (
+                        <View
+                            className="absolute bottom-10 left-6 right-6 bg-surface dark:bg-surface-dark p-4 rounded-3xl flex-row items-center justify-between border border-secondary/10"
+                            style={{ elevation: 10 }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => handleBulkAction('Cancel')}
+                                className="bg-danger/10 h-14 rounded-2xl flex-1 mr-2 flex-row items-center justify-center border border-danger/20"
+                            >
+                                <X color="#EF4444" size={18} />
+                                <Text className="text-danger font-sans-bold ml-2">Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => handleBulkAction('Return')}
+                                className="bg-warning/10 h-14 rounded-2xl flex-1 mx-2 flex-row items-center justify-center border border-warning/20"
+                            >
+                                <RotateCcw color="#F59E0B" size={18} />
+                                <Text className="text-warning font-sans-bold ml-2">Return</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleBulkDelete}
+                                className="bg-danger h-14 rounded-2xl flex-row items-center justify-center flex-1 ml-2"
+                            >
+                                <Trash2 color="#FFFFFF" size={18} />
+                                <Text className="text-white font-sans-bold ml-2">Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Date Pickers */}
+                    {showPicker && (
+                        <DateTimePicker
+                            value={showPicker === 'start' ? startDate : endDate}
+                            mode="date"
+                            display="default"
+                            onChange={(event, selectedDate) => {
+                                setShowPicker(null);
+                                if (selectedDate) {
+                                    if (showPicker === 'start') setStartDate(selectedDate);
+                                    else setEndDate(selectedDate);
+                                }
+                            }}
+                        />
+                    )}
+
+                    {/* Share Statement Modal */}
+                    <Modal visible={shareModalVisible} animationType="slide" transparent>
+                        <View className="flex-1 justify-end bg-black/40">
+                            <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShareModalVisible(false)} />
+                            <View className="bg-white dark:bg-surface-dark rounded-t-[40px] p-8 pb-10">
+                                <View className="items-center mb-8">
+                                    <View className="w-16 h-1.5 bg-divider dark:bg-divider-dark rounded-full mb-8" />
+                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl">Share Statement</Text>
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-sm mt-1">Configure your PDF report</Text>
                                 </View>
 
-                                <View className="flex-row mb-6 bg-surface dark:bg-background-dark p-1 rounded-2xl border border-divider dark:border-divider-dark">
-                                    <TouchableOpacity
-                                        onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentIn' })}
-                                        style={{
-                                            flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                                            backgroundColor: paymentForm.type === 'PaymentIn' ? '#10B981' : 'transparent',
-                                        }}
-                                    >
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
-                                            color: paymentForm.type === 'PaymentIn' ? '#FFFFFF' : '#94A3B8',
-                                        }}>
-                                            IN
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={() => setPaymentForm({ ...paymentForm, type: 'PaymentOut' })}
-                                        style={{
-                                            flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
-                                            backgroundColor: paymentForm.type === 'PaymentOut' ? '#EF4444' : 'transparent',
-                                        }}
-                                    >
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12,
-                                            color: paymentForm.type === 'PaymentOut' ? '#FFFFFF' : '#94A3B8',
-                                        }}>
-                                            OUT
-                                        </Text>
-                                    </TouchableOpacity>
+                                {/* Toggle Type */}
+                                <View className="mb-8">
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-4 ml-1">Report Type</Text>
+                                    <View className="flex-row bg-background dark:bg-background-dark p-1.5 rounded-2xl border border-divider dark:border-divider-dark">
+                                        <TouchableOpacity
+                                            onPress={() => setShareType('Udhar')}
+                                            style={{
+                                                flex: 1, paddingVertical: 14, borderRadius: 12,
+                                                alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
+                                                backgroundColor: shareType === 'Udhar' ? '#4F46E5' : 'transparent',
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14,
+                                                color: shareType === 'Udhar' ? '#FFFFFF' : '#94A3B8',
+                                            }}>Udhar Only</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => setShareType('Full')}
+                                            style={{
+                                                flex: 1, paddingVertical: 14, borderRadius: 12,
+                                                alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
+                                                backgroundColor: shareType === 'Full' ? '#4F46E5' : 'transparent',
+                                            }}
+                                        >
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14,
+                                                color: shareType === 'Full' ? '#FFFFFF' : '#94A3B8',
+                                            }}>Full Ledger</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
 
-                                <Input
-                                    label="Amount (₹)"
-                                    placeholder="0.00"
-                                    keyboardType="numeric"
-                                    value={paymentForm.amount}
-                                    onChangeText={text => setPaymentForm({ ...paymentForm, amount: text })}
-                                />
-                                <Input
-                                    label="Notes"
-                                    placeholder="Add notes..."
-                                    value={paymentForm.notes}
-                                    onChangeText={text => setPaymentForm({ ...paymentForm, notes: text })}
-                                />
+                                {/* Date Selection */}
+                                <View className="mb-8">
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-4 ml-1">Date Range</Text>
+
+                                    {/* Quick Options */}
+                                    <View className="flex-row flex-wrap gap-2 mb-4">
+                                        {['Today', 'Week', 'Month', 'All'].map((q) => (
+                                            <TouchableOpacity
+                                                key={q}
+                                                onPress={() => setQuickRange(q as any)}
+                                                className="px-4 py-2 bg-background dark:bg-background-dark border border-divider dark:border-divider-dark rounded-xl"
+                                            >
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs">{q}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+
+                                    <View className="flex-row items-center gap-3">
+                                        <TouchableOpacity
+                                            onPress={() => setShowPicker('start')}
+                                            className="flex-1 bg-background dark:bg-background-dark p-4 rounded-2xl border border-divider dark:border-divider-dark"
+                                        >
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] uppercase mb-1">Start Date</Text>
+                                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">{startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
+                                        </TouchableOpacity>
+                                        <ChevronRight size={16} color="#94A3B8" />
+                                        <TouchableOpacity
+                                            onPress={() => setShowPicker('end')}
+                                            className="flex-1 bg-background dark:bg-background-dark p-4 rounded-2xl border border-divider dark:border-divider-dark"
+                                        >
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] uppercase mb-1">End Date</Text>
+                                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">{endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
 
                                 <Button
-                                    onPress={handleAddPayment}
-                                    className="mt-4"
-                                    variant={paymentForm.type === 'PaymentIn' ? 'primary' : 'danger'}
+                                    onPress={handleShare}
+                                    loading={sharing}
+                                    className="h-16 rounded-2xl"
                                 >
-                                    <Text className="text-white font-sans-bold">Confirm Payment</Text>
+                                    <Share2 color="white" size={20} style={{ marginRight: 8 }} />
+                                    <Text className="text-white font-sans-bold text-lg">Generate PDF</Text>
                                 </Button>
                             </View>
-                        </KeyboardAvoidingView>
-                    </View>
-                </Modal>
-
-                {/* Edit Note Modal */}
-                <Modal visible={editModalVisible} transparent animationType="fade">
-                    <View className="flex-1 justify-center bg-black/40 px-6">
-                        <Card className="p-6">
-                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-lg mb-4">Edit Note</Text>
-                            <Input placeholder="Add notes..." value={editNotes} onChangeText={setEditNotes} multiline />
-                            <View className="flex-row gap-3 mt-6">
-                                <Button variant="secondary" onPress={() => setEditModalVisible(false)} className="flex-1">
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans-bold">Cancel</Text>
-                                </Button>
-                                <Button onPress={handleUpdateNotes} className="flex-1">
-                                    <Text className="text-white font-sans-bold">Save</Text>
-                                </Button>
-                            </View>
-                        </Card>
-                    </View>
-                </Modal>
-
-                {/* Order Preview Modal */}
-                <Modal visible={orderModalVisible} transparent animationType="fade">
-                    <View className="flex-1 justify-center bg-black/40 px-6">
-                        <Card className="p-6">
-                            <View className="flex-row justify-between items-start mb-4">
-                                <View>
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase mb-1">Order Transaction</Text>
-                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{selectedEntry?.orderProductName}</Text>
-                                </View>
-                                <TouchableOpacity onPress={() => setOrderModalVisible(false)} className="p-2 bg-surface dark:bg-surface-dark rounded-full">
-                                    <X size={18} color={isDark ? '#94A3B8' : '#9CA3AF'} />
-                                </TouchableOpacity>
-                            </View>
-                            <View className="gap-2 mb-6">
-                                <View className="flex-row justify-between p-3 bg-background dark:bg-background-dark rounded-xl">
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">Type</Text>
-                                    <Text className="text-accent font-sans-bold text-sm">{selectedEntry?.transactionType}</Text>
-                                </View>
-                                <View className="flex-row justify-between p-3 bg-background dark:bg-background-dark rounded-xl">
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">Amount</Text>
-                                    <Text className={cn("font-sans-bold text-lg",
-                                        ['Sale', 'PaymentIn'].includes(selectedEntry?.transactionType || '') ? "text-success" : "text-danger"
-                                    )}>
-                                        {['Sale', 'PaymentIn'].includes(selectedEntry?.transactionType || '') ? '+' : '-'}
-                                        ₹{Math.abs(selectedEntry?.amount || 0).toLocaleString()}
-                                    </Text>
-                                </View>
-                            </View>
-                            <Button variant="secondary" onPress={() => setOrderModalVisible(false)} className="w-full">
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold">Close</Text>
-                            </Button>
-                        </Card>
-                    </View>
-                </Modal>
-
-                {/* Bulk Action Footer */}
-                {selectionMode && (
-                    <View
-                        className="absolute bottom-10 left-6 right-6 bg-surface dark:bg-surface-dark p-4 rounded-3xl flex-row items-center justify-between border border-secondary/10"
-                        style={{ elevation: 10 }}
-                    >
-                        <TouchableOpacity
-                            onPress={() => handleBulkAction('Cancel')}
-                            className="bg-danger/10 h-14 rounded-2xl flex-1 mr-2 flex-row items-center justify-center border border-danger/20"
-                        >
-                            <X color="#EF4444" size={18} />
-                            <Text className="text-danger font-sans-bold ml-2">Cancel</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => handleBulkAction('Return')}
-                            className="bg-warning/10 h-14 rounded-2xl flex-1 mx-2 flex-row items-center justify-center border border-warning/20"
-                        >
-                            <RotateCcw color="#F59E0B" size={18} />
-                            <Text className="text-warning font-sans-bold ml-2">Return</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={handleBulkDelete}
-                            className="bg-danger h-14 rounded-2xl flex-row items-center justify-center flex-1 ml-2"
-                        >
-                            <Trash2 color="#FFFFFF" size={18} />
-                            <Text className="text-white font-sans-bold ml-2">Delete</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Date Pickers */}
-                {showPicker && (
-                    <DateTimePicker
-                        value={showPicker === 'start' ? startDate : endDate}
-                        mode="date"
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                            setShowPicker(null);
-                            if (selectedDate) {
-                                if (showPicker === 'start') setStartDate(selectedDate);
-                                else setEndDate(selectedDate);
-                            }
-                        }}
-                    />
-                )}
-
-                {/* Share Statement Modal */}
-                <Modal visible={shareModalVisible} animationType="slide" transparent>
-                    <View className="flex-1 justify-end bg-black/40">
-                        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setShareModalVisible(false)} />
-                        <View className="bg-white dark:bg-surface-dark rounded-t-[40px] p-8 pb-10">
-                            <View className="items-center mb-8">
-                                <View className="w-16 h-1.5 bg-divider dark:bg-divider-dark rounded-full mb-8" />
-                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl">Share Statement</Text>
-                                <Text className="text-secondary dark:text-secondary-dark font-sans text-sm mt-1">Configure your PDF report</Text>
-                            </View>
-
-                            {/* Toggle Type */}
-                            <View className="mb-8">
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-4 ml-1">Report Type</Text>
-                                <View className="flex-row bg-background dark:bg-background-dark p-1.5 rounded-2xl border border-divider dark:border-divider-dark">
-                                    <TouchableOpacity
-                                        onPress={() => setShareType('Udhar')}
-                                        style={{
-                                            flex: 1, paddingVertical: 14, borderRadius: 12,
-                                            alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
-                                            backgroundColor: shareType === 'Udhar' ? '#4F46E5' : 'transparent',
-                                        }}
-                                    >
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14,
-                                            color: shareType === 'Udhar' ? '#FFFFFF' : '#94A3B8',
-                                        }}>Udhar Only</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        onPress={() => setShareType('Full')}
-                                        style={{
-                                            flex: 1, paddingVertical: 14, borderRadius: 12,
-                                            alignItems: 'center', flexDirection: 'row', justifyContent: 'center',
-                                            backgroundColor: shareType === 'Full' ? '#4F46E5' : 'transparent',
-                                        }}
-                                    >
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14,
-                                            color: shareType === 'Full' ? '#FFFFFF' : '#94A3B8',
-                                        }}>Full Ledger</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Date Selection */}
-                            <View className="mb-8">
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-4 ml-1">Date Range</Text>
-
-                                {/* Quick Options */}
-                                <View className="flex-row flex-wrap gap-2 mb-4">
-                                    {['Today', 'Week', 'Month', 'All'].map((q) => (
-                                        <TouchableOpacity
-                                            key={q}
-                                            onPress={() => setQuickRange(q as any)}
-                                            className="px-4 py-2 bg-background dark:bg-background-dark border border-divider dark:border-divider-dark rounded-xl"
-                                        >
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs">{q}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-
-                                <View className="flex-row items-center gap-3">
-                                    <TouchableOpacity
-                                        onPress={() => setShowPicker('start')}
-                                        className="flex-1 bg-background dark:bg-background-dark p-4 rounded-2xl border border-divider dark:border-divider-dark"
-                                    >
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] uppercase mb-1">Start Date</Text>
-                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">{startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
-                                    </TouchableOpacity>
-                                    <ChevronRight size={16} color="#94A3B8" />
-                                    <TouchableOpacity
-                                        onPress={() => setShowPicker('end')}
-                                        className="flex-1 bg-background dark:bg-background-dark p-4 rounded-2xl border border-divider dark:border-divider-dark"
-                                    >
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] uppercase mb-1">End Date</Text>
-                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">{endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <Button
-                                onPress={handleShare}
-                                loading={sharing}
-                                className="h-16 rounded-2xl"
-                            >
-                                <Share2 color="white" size={20} style={{ marginRight: 8 }} />
-                                <Text className="text-white font-sans-bold text-lg">Generate PDF</Text>
-                            </Button>
                         </View>
-                    </View>
-                </Modal>
+                    </Modal>
 
-                <ConfirmDialog
-                    visible={alertConfig.visible}
-                    title={alertConfig.title}
-                    message={alertConfig.message}
-                    type={alertConfig.type}
-                    onConfirm={() => setAlertConfig({ ...alertConfig, visible: false })}
-                    onCancel={() => setAlertConfig({ ...alertConfig, visible: false })}
-                    confirmText="Okay"
-                    cancelText=""
-                />
+                    <ConfirmDialog
+                        visible={alertConfig.visible}
+                        title={alertConfig.title}
+                        message={alertConfig.message}
+                        type={alertConfig.type}
+                        onConfirm={() => setAlertConfig({ ...alertConfig, visible: false })}
+                        onCancel={() => setAlertConfig({ ...alertConfig, visible: false })}
+                        confirmText="Okay"
+                        cancelText=""
+                    />
                 </View>
             </SafeAreaView>
 

@@ -22,9 +22,11 @@ export interface Transaction {
     courierName?: string;
     pickupCharges?: number;
     shippingCharges?: number;
-    status?: 'Pending' | 'Booked' | 'Shipped' | 'Delivered' | 'Canceled' | 'Returned';
-    notes?: string;
     statusHistory?: StatusHistoryEntry[];
+    quantity?: number;
+    unitOriginalPrice?: number;
+    unitSellingPrice?: number;
+    notes?: string;
     createdAt: number;
     amount?: number; // For Payment/Expense types
 }
@@ -54,8 +56,11 @@ export interface Order {
     vendorPaymentStatus?: 'Paid' | 'Udhar';
     customerPaymentStatus?: 'Paid' | 'Udhar';
     pickupPaymentStatus?: 'Paid' | 'Udhar';
-    notes?: string;
     statusHistory?: StatusHistoryEntry[];
+    quantity: number;
+    unitOriginalPrice: number;
+    unitSellingPrice: number;
+    notes?: string;
     createdAt: number;
 }
 
@@ -70,6 +75,7 @@ export interface LedgerEntry {
     notes?: string;
     orderProductName?: string; // Joined from orders
     orderStatus?: string;      // Joined from orders
+    orderQuantity?: number;    // Joined from orders
     createdAt: number;
     isSettled?: boolean;       // true when payment was marked as Paid at order creation
     settledAt?: number;        // timestamp of when it was settled (payment time)
@@ -86,13 +92,18 @@ export interface DirectoryItem {
     totalPurchases?: number;
     lastTransactionDate?: number;
     createdAt: number;
+    isActive?: boolean;
 }
 
 export type Period = 'This Week' | 'This Month' | 'Last 3 Months' | 'Custom';
 
 export const calculateMargin = (original: number, selling: number, pickup: number = 0, shipping: number = 0) => {
+    // If shipping/pickup are charged to customer, they are revenue. 
+    // If they are paid by shop, they are costs.
+    // In our case, they cancel out in the net margin if the customer pays exactly what they cost.
+    const revenue = selling + shipping + pickup;
     const totalCost = original + pickup + shipping;
-    const margin = selling - totalCost;
+    const margin = revenue - totalCost;
     const percentage = original > 0 ? (margin / original) * 100 : 0;
     return {
         margin,

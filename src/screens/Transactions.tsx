@@ -243,307 +243,310 @@ export default function Transactions({ navigation }: { navigation: any }) {
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                     <View className="px-6 pt-4 pb-2">
-                    {selectionMode ? (
-                        <View className="-mx-6 px-6 py-2 mb-4 bg-accent/10 flex-row items-center">
-                            <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="p-2 mr-3">
-                                <X color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
-                            </TouchableOpacity>
-                            <Text className="flex-1 text-primary dark:text-primary-dark font-sans-bold text-lg">
-                                {selectedIds.size} Selected
-                            </Text>
-                        </View>
-                    ) : (
-                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Orders</Text>
-                    )}
-
-                    {/* Search and Filters */}
-                    <View className="flex-row items-center gap-3 mb-3">
-                        {!selectionMode && (
-                            <View className="flex-1 flex-row items-center bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12">
-                                <Search size={18} color="#9CA3AF" />
-                                <TextInput
-                                    placeholder="Search orders..."
-                                    placeholderTextColor="#9CA3AF"
-                                    className="flex-1 ml-3 text-primary dark:text-primary-dark font-sans text-sm"
-                                    value={search}
-                                    onChangeText={setSearch}
-                                />
+                        {selectionMode ? (
+                            <View className="-mx-6 px-6 py-2 mb-4 bg-accent/10 flex-row items-center">
+                                <TouchableOpacity onPress={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="p-2 mr-3">
+                                    <X color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
+                                </TouchableOpacity>
+                                <Text className="flex-1 text-primary dark:text-primary-dark font-sans-bold text-lg">
+                                    {selectedIds.size} Selected
+                                </Text>
                             </View>
+                        ) : (
+                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Orders</Text>
                         )}
-                    </View>
 
-                    {/* Status chips */}
-                    <View className="-mx-6">
-                        <ScrollView
-                            horizontal={true}
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 4, gap: 10 }}
-                        >
-                            {statusChips.map(s => (
-                                <TouchableOpacity
-                                    key={s}
-                                    onPress={() => setStatusFilter(s)}
-                                    style={{
-                                        paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16, borderWidth: 1,
-                                        backgroundColor: statusFilter === s ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
-                                        borderColor: statusFilter === s ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
-                                    }}
-                                >
-                                    <Text style={{
-                                        fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10,
-                                        textTransform: 'uppercase', letterSpacing: 1.5,
-                                        color: statusFilter === s ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
-                                    }}>
-                                        {s === 'All' ? `All (${filtered.length})` : s}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </View>
-
-                <FlatList
-                    data={grouped}
-                    keyExtractor={item => item.label}
-                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
-                    onRefresh={refresh}
-                    refreshing={loading}
-                    renderItem={({ item: group }) => (
-                        <View className="mb-4">
-                            <View className="flex-row items-center mb-2 mt-2">
-                                <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider">{group.label}</Text>
-                                {selectionMode && (
-                                    <TouchableOpacity
-                                        onPress={() => toggleDateSelection(group.label)}
-                                        className="px-4 py-2 bg-accent/10 rounded-xl border border-accent/20"
-                                    >
-                                        <Text className="text-accent font-sans-bold text-[10px] uppercase tracking-wider">Select Date</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                            <Card className="px-4 py-0">
-                                {group.data.map((item: any, i: number) => (
-                                    <TouchableOpacity
-                                        key={item.id}
-                                        onPress={() => {
-                                            if (selectionMode) toggleSelection(item.id);
-                                            else navigation.navigate('OrderDetail', { order: item });
-                                        }}
-                                        onLongPress={() => handleLongPress(item.id)}
-                                        delayLongPress={300}
-                                        activeOpacity={0.6}
-                                        className={cn(
-                                            "py-3 flex-row items-center",
-                                            i > 0 && "border-t border-divider dark:border-divider-dark",
-                                            selectionMode && selectedIds.has(item.id) && (isDark ? 'bg-accent/10' : 'bg-accent/5')
-                                        )}
-                                    >
-                                        {/* Selection Checkbox */}
-                                        {selectionMode && (
-                                            <View className="mr-3">
-                                                {selectedIds.has(item.id) ? (
-                                                    <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
-                                                        <Check color="white" size={12} strokeWidth={3} />
-                                                    </View>
-                                                ) : (
-                                                    <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
-                                                )}
-                                            </View>
-                                        )}
-                                        <View className="flex-row items-center flex-1">
-                                            <View className="flex-1">
-                                                <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm" numberOfLines={1}>{item.productName}</Text>
-                                                <View className="flex-row items-center mt-1 gap-2">
-                                                    <View className={cn("w-2 h-2 rounded-full",
-                                                        item.customerPaymentStatus === 'Paid' ? 'bg-success' : 'bg-warning'
-                                                    )} />
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.customerName}</Text>
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">→</Text>
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.vendorName}</Text>
-                                                </View>
-                                            </View>
-                                            <View className="items-end ml-3">
-                                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">₹{Number(item.sellingPrice).toLocaleString()}</Text>
-                                                <View className="flex-row items-center gap-2 mt-2">
-                                                    {/* Quick advance button */}
-                                                    {STATUS_FLOW[item.status] && !selectionMode && (
-                                                        <TouchableOpacity
-                                                            onPress={(e) => {
-                                                                e.stopPropagation();
-                                                                handleQuickAdvance(item);
-                                                            }}
-                                                            disabled={updatingId === item.id}
-                                                            className="px-3 py-1 rounded-lg bg-accent/20 border border-accent/30"
-                                                            activeOpacity={0.6}
-                                                        >
-                                                            <Text className="text-accent dark:text-accent-dark font-sans-bold text-[11px] uppercase tracking-tighter">
-                                                                {getNextLabel(item.status)}
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    )}
-                                                    {/* Status badge with dropdown */}
-                                                    <TouchableOpacity
-                                                        onPress={(e) => {
-                                                            if (selectionMode) {
-                                                                e.stopPropagation();
-                                                                toggleSelection(item.id);
-                                                                return;
-                                                            }
-                                                            e.stopPropagation();
-                                                            setSelectedOrder(item);
-                                                            setPickerVisible(true);
-                                                        }}
-                                                        disabled={updatingId === item.id}
-                                                        className={cn("flex-row items-center px-2 py-1 rounded-lg", getStatusStyle(item.status).bg)}
-                                                        activeOpacity={0.7}
-                                                    >
-                                                        {updatingId === item.id ? (
-                                                            <ActivityIndicator size={10} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                                        ) : (
-                                                            <>
-                                                                <Text className={cn("font-sans-bold text-[10px] uppercase", getStatusStyle(item.status).text)}>
-                                                                    {item.status || 'Pending'}
-                                                                </Text>
-                                                                <ChevronDown size={10} color={getStatusStyle(item.status).color} style={{ marginLeft: 3 }} />
-                                                            </>
-                                                        )}
-                                                    </TouchableOpacity>
-                                                </View>
-                                            </View>
-                                        </View>
-                                    </TouchableOpacity>
-                                ))}
-                            </Card>
-                        </View>
-                    )}
-                    ListEmptyComponent={
-                        <View className="items-center py-20">
-                            <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">No orders found</Text>
-                        </View>
-                    }
-                />
-
-                <BottomSheetPicker
-                    visible={pickerVisible}
-                    onClose={() => setPickerVisible(false)}
-                    title="Change Status"
-                    options={statusOptions}
-                    selectedValue={selectedOrder?.status}
-                    onSelect={(val) => {
-                        if (selectedOrder) handleStatusChange(selectedOrder.id, val);
-                    }}
-                />
-
-                {/* Bulk Action Footer */}
-                {selectionMode && (
-                    <View
-                        className="absolute bottom-28 left-6 right-6 bg-surface dark:bg-surface-dark p-4 rounded-3xl flex-row items-center justify-between shadow-2xl border border-secondary/10"
-                        style={{ elevation: 10 }}
-                    >
-                        <TouchableOpacity
-                            onPress={() => handleBulkAction('Cancel')}
-                            className="bg-danger/10 h-14 rounded-2xl flex-1 mr-2 flex-row items-center justify-center border border-danger/20"
-                        >
-                            <X color="#EF4444" size={18} />
-                            <Text className="text-danger font-sans-bold ml-2">Cancel</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={() => handleBulkAction('Return')}
-                            className="bg-warning/10 h-14 rounded-2xl flex-1 mx-2 flex-row items-center justify-center border border-warning/20"
-                        >
-                            <RotateCcw color="#F59E0B" size={18} />
-                            <Text className="text-warning font-sans-bold ml-2">Return</Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={handleBulkDelete}
-                            className="bg-danger h-14 rounded-2xl flex-row items-center justify-center flex-1 ml-2 shadow-sm shadow-danger/20"
-                        >
-                            <Trash2 color="#FFFFFF" size={18} />
-                            <Text className="text-white font-sans-bold ml-2">Delete</Text>
-                        </TouchableOpacity>
-                    </View>
-                )}
-
-                {/* Action Modal */}
-                <Modal visible={actionModalVisible} transparent animationType="fade">
-                    <View className="flex-1 bg-black/50 justify-center p-6">
-                        <Card className="p-6">
-                            <View className="flex-row justify-between items-center mb-4">
-                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{actionType} Order</Text>
-                                <TouchableOpacity onPress={() => setActionModalVisible(false)}>
-                                    <X color={isDark ? '#94A3B8' : '#6B7280'} size={20} />
-                                </TouchableOpacity>
-                            </View>
-                            <Text className="text-secondary dark:text-secondary-dark font-sans text-sm mb-6">
-                                {actionType === 'Cancel'
-                                    ? "This will issue a full refund to the customer and recoup logistics costs from staff."
-                                    : "This will refund the product price only. You can also specify a return fee."}
-                            </Text>
-
-                            {actionType === 'Cancel' ? (
-                                <View className="gap-4 mb-6">
-                                    <TouchableOpacity
-                                        onPress={() => setRefundFromShop(!refundFromShop)}
-                                        className="flex-row items-center"
-                                    >
-                                        <View className={cn("w-5 h-5 rounded border-2 mr-3 items-center justify-center",
-                                            refundFromShop ? "bg-accent border-accent" : "border-divider"
-                                        )}>
-                                            {refundFromShop && <Check color="white" size={12} strokeWidth={3} />}
-                                        </View>
-                                        <View>
-                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">Refund Product Case?</Text>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">Product cost paid back to customer</Text>
-                                        </View>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                        onPress={() => setRefundFromStaff(!refundFromStaff)}
-                                        className="flex-row items-center"
-                                    >
-                                        <View className={cn("w-5 h-5 rounded border-2 mr-3 items-center justify-center",
-                                            refundFromStaff ? "bg-accent border-accent" : "border-divider"
-                                        )}>
-                                            {refundFromStaff && <Check color="white" size={12} strokeWidth={3} />}
-                                        </View>
-                                        <View>
-                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">Recoup Logistics?</Text>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">Recoup shipping/pickup price from staff ledgers</Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                </View>
-                            ) : (
-                                <View className="mb-6">
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2">RETURN FEE (Deducted from refund)</Text>
-                                    <Input
-                                        value={returnFee}
-                                        onChangeText={setReturnFee}
-                                        keyboardType="numeric"
-                                        placeholder="0"
+                        {/* Search and Filters */}
+                        <View className="flex-row items-center gap-3 mb-3">
+                            {!selectionMode && (
+                                <View className="flex-1 flex-row items-center bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12">
+                                    <Search size={18} color="#9CA3AF" />
+                                    <TextInput
+                                        placeholder="Search orders..."
+                                        placeholderTextColor="#9CA3AF"
+                                        className="flex-1 ml-3 text-primary dark:text-primary-dark font-sans text-sm"
+                                        value={search}
+                                        onChangeText={setSearch}
                                     />
                                 </View>
                             )}
+                        </View>
 
-                            <View className="flex-row gap-3">
-                                <Button
-                                    className="flex-1" variant="outline"
-                                    onPress={() => setActionModalVisible(false)}
-                                >
-                                    Go Back
-                                </Button>
-                                <Button
-                                    className="flex-1" loading={bulkActionLoading}
-                                    variant={actionType === 'Cancel' ? 'danger' : 'primary'}
-                                    onPress={confirmBulkAction}
-                                >
-                                    Confirm {actionType}
-                                </Button>
-                            </View>
-                        </Card>
+                        {/* Status chips */}
+                        <View className="-mx-6">
+                            <ScrollView
+                                horizontal={true}
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 4, gap: 10 }}
+                            >
+                                {statusChips.map(s => (
+                                    <TouchableOpacity
+                                        key={s}
+                                        onPress={() => setStatusFilter(s)}
+                                        style={{
+                                            paddingHorizontal: 20, paddingVertical: 10, borderRadius: 16, borderWidth: 1,
+                                            backgroundColor: statusFilter === s ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
+                                            borderColor: statusFilter === s ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
+                                        }}
+                                    >
+                                        <Text style={{
+                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10,
+                                            textTransform: 'uppercase', letterSpacing: 1.5,
+                                            color: statusFilter === s ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                                        }}>
+                                            {s === 'All' ? `All (${filtered.length})` : s}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </View>
                     </View>
-                </Modal>
+
+                    <FlatList
+                        data={grouped}
+                        keyExtractor={item => item.label}
+                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: isWeb ? 40 : 100 }}
+                        onRefresh={refresh}
+                        refreshing={loading}
+                        renderItem={({ item: group }) => (
+                            <View className="mb-4">
+                                <View className="flex-row items-center mb-2 mt-2">
+                                    <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider">{group.label}</Text>
+                                    {selectionMode && (
+                                        <TouchableOpacity
+                                            onPress={() => toggleDateSelection(group.label)}
+                                            className="px-4 py-2 bg-accent/10 rounded-xl border border-accent/20"
+                                        >
+                                            <Text className="text-accent font-sans-bold text-[10px] uppercase tracking-wider">Select Date</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                                <Card className="px-4 py-0">
+                                    {group.data.map((item: any, i: number) => (
+                                        <TouchableOpacity
+                                            key={item.id}
+                                            onPress={() => {
+                                                if (selectionMode) toggleSelection(item.id);
+                                                else navigation.navigate('OrderDetail', { order: item });
+                                            }}
+                                            onLongPress={() => handleLongPress(item.id)}
+                                            delayLongPress={300}
+                                            activeOpacity={0.6}
+                                            className={cn(
+                                                "py-3 flex-row items-center",
+                                                i > 0 && "border-t border-divider dark:border-divider-dark",
+                                                selectionMode && selectedIds.has(item.id) && (isDark ? 'bg-accent/10' : 'bg-accent/5')
+                                            )}
+                                        >
+                                            {/* Selection Checkbox */}
+                                            {selectionMode && (
+                                                <View className="mr-3">
+                                                    {selectedIds.has(item.id) ? (
+                                                        <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
+                                                            <Check color="white" size={12} strokeWidth={3} />
+                                                        </View>
+                                                    ) : (
+                                                        <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
+                                                    )}
+                                                </View>
+                                            )}
+                                            <View className="flex-row items-center flex-1">
+                                                <View className="flex-1">
+                                                    <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm" numberOfLines={1}>
+                                                        {item.productName} {item.quantity > 1 ? `(x${item.quantity})` : ''}
+                                                    </Text>
+                                                    <View className="flex-row items-center mt-1 gap-2">
+                                                        <View className={cn("w-2 h-2 rounded-full",
+                                                            item.customerPaymentStatus === 'Paid' ? 'bg-success' : 'bg-warning'
+                                                        )} />
+                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.customerName}</Text>
+                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">→</Text>
+                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.vendorName}</Text>
+                                                    </View>
+                                                </View>
+                                                <View className="items-end ml-3">
+                                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">₹{(Number(item.sellingPrice) + Number(item.shippingCharges || 0) + Number(item.pickupCharges || 0)).toLocaleString()}</Text>
+                                                    <View className="flex-row items-center gap-2 mt-2">
+                                                        {/* Quick advance button */}
+                                                        {STATUS_FLOW[item.status] && !selectionMode && (
+                                                            <TouchableOpacity
+                                                                onPress={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleQuickAdvance(item);
+                                                                }}
+                                                                disabled={updatingId === item.id}
+                                                                className="px-3 py-1 rounded-lg bg-accent/20 border border-accent/30"
+                                                                activeOpacity={0.6}
+                                                            >
+                                                                <Text className="text-accent dark:text-accent-dark font-sans-bold text-[11px] uppercase tracking-tighter">
+                                                                    {getNextLabel(item.status)}
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        )}
+                                                        {/* Status badge with dropdown */}
+                                                        <TouchableOpacity
+                                                            onPress={(e) => {
+                                                                if (selectionMode) {
+                                                                    e.stopPropagation();
+                                                                    toggleSelection(item.id);
+                                                                    return;
+                                                                }
+                                                                e.stopPropagation();
+                                                                setSelectedOrder(item);
+                                                                setPickerVisible(true);
+                                                            }}
+                                                            disabled={updatingId === item.id}
+                                                            className={cn("flex-row items-center px-2 py-1 rounded-lg", getStatusStyle(item.status).bg)}
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            {updatingId === item.id ? (
+                                                                <ActivityIndicator size={10} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                            ) : (
+                                                                <>
+                                                                    <Text className={cn("font-sans-bold text-[10px] uppercase", getStatusStyle(item.status).text)}>
+                                                                        {item.status || 'Pending'}
+                                                                    </Text>
+                                                                    <ChevronDown size={10} color={getStatusStyle(item.status).color} style={{ marginLeft: 3 }} />
+                                                                </>
+                                                            )}
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </Card>
+                            </View>
+                        )}
+                        ListEmptyComponent={
+                            <View className="items-center py-20">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">No orders found</Text>
+                            </View>
+                        }
+                    />
+
+                    <BottomSheetPicker
+                        visible={pickerVisible}
+                        onClose={() => setPickerVisible(false)}
+                        title="Change Status"
+                        options={statusOptions}
+                        selectedValue={selectedOrder?.status}
+                        onSelect={(val) => {
+                            if (selectedOrder) handleStatusChange(selectedOrder.id, val);
+                        }}
+                    />
+
+                    {/* Bulk Action Footer */}
+                    {selectionMode && (
+                        <View
+                            className="absolute bottom-28 left-6 right-6 bg-surface dark:bg-surface-dark p-4 rounded-3xl flex-row items-center justify-between border border-secondary/10"
+                            style={{ elevation: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.15, shadowRadius: 24 }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => handleBulkAction('Cancel')}
+                                className="bg-danger/10 h-14 rounded-2xl flex-1 mr-2 flex-row items-center justify-center border border-danger/20"
+                            >
+                                <X color="#EF4444" size={18} />
+                                <Text className="text-danger font-sans-bold ml-2">Cancel</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => handleBulkAction('Return')}
+                                className="bg-warning/10 h-14 rounded-2xl flex-1 mx-2 flex-row items-center justify-center border border-warning/20"
+                            >
+                                <RotateCcw color="#F59E0B" size={18} />
+                                <Text className="text-warning font-sans-bold ml-2">Return</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={handleBulkDelete}
+                                className="bg-danger h-14 rounded-2xl flex-row items-center justify-center flex-1 ml-2"
+                                style={{ elevation: 2, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4 }}
+                            >
+                                <Trash2 color="#FFFFFF" size={18} />
+                                <Text className="text-white font-sans-bold ml-2">Delete</Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    {/* Action Modal */}
+                    <Modal visible={actionModalVisible} transparent animationType="fade">
+                        <View className="flex-1 bg-black/50 justify-center p-6">
+                            <Card className="p-6">
+                                <View className="flex-row justify-between items-center mb-4">
+                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{actionType} Order</Text>
+                                    <TouchableOpacity onPress={() => setActionModalVisible(false)}>
+                                        <X color={isDark ? '#94A3B8' : '#6B7280'} size={20} />
+                                    </TouchableOpacity>
+                                </View>
+                                <Text className="text-secondary dark:text-secondary-dark font-sans text-sm mb-6">
+                                    {actionType === 'Cancel'
+                                        ? "This will issue a full refund to the customer and recoup logistics costs from staff."
+                                        : "This will refund the product price only. You can also specify a return fee."}
+                                </Text>
+
+                                {actionType === 'Cancel' ? (
+                                    <View className="gap-4 mb-6">
+                                        <TouchableOpacity
+                                            onPress={() => setRefundFromShop(!refundFromShop)}
+                                            className="flex-row items-center"
+                                        >
+                                            <View className={cn("w-5 h-5 rounded border-2 mr-3 items-center justify-center",
+                                                refundFromShop ? "bg-accent border-accent" : "border-divider"
+                                            )}>
+                                                {refundFromShop && <Check color="white" size={12} strokeWidth={3} />}
+                                            </View>
+                                            <View>
+                                                <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">Refund Product Case?</Text>
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">Product cost paid back to customer</Text>
+                                            </View>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            onPress={() => setRefundFromStaff(!refundFromStaff)}
+                                            className="flex-row items-center"
+                                        >
+                                            <View className={cn("w-5 h-5 rounded border-2 mr-3 items-center justify-center",
+                                                refundFromStaff ? "bg-accent border-accent" : "border-divider"
+                                            )}>
+                                                {refundFromStaff && <Check color="white" size={12} strokeWidth={3} />}
+                                            </View>
+                                            <View>
+                                                <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">Recoup Logistics?</Text>
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">Recoup shipping/pickup price from staff ledgers</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    </View>
+                                ) : (
+                                    <View className="mb-6">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2">RETURN FEE (Deducted from refund)</Text>
+                                        <Input
+                                            value={returnFee}
+                                            onChangeText={setReturnFee}
+                                            keyboardType="numeric"
+                                            placeholder="0"
+                                        />
+                                    </View>
+                                )}
+
+                                <View className="flex-row gap-3">
+                                    <Button
+                                        className="flex-1" variant="outline"
+                                        onPress={() => setActionModalVisible(false)}
+                                    >
+                                        Go Back
+                                    </Button>
+                                    <Button
+                                        className="flex-1" loading={bulkActionLoading}
+                                        variant={actionType === 'Cancel' ? 'danger' : 'primary'}
+                                        onPress={confirmBulkAction}
+                                    >
+                                        Confirm {actionType}
+                                    </Button>
+                                </View>
+                            </Card>
+                        </View>
+                    </Modal>
                 </View>
             </SafeAreaView>
             <ConfirmDialog

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Switch, ScrollView, TextInput, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, ScrollView, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
@@ -35,14 +35,10 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
             await supabaseService.seedDemoData(user.id);
             await refresh();
             setSeedConfirmVisible(false);
-            import('react-native').then(({ Alert }) => {
-                Alert.alert('Success', 'Demo data seeded successfully! You can now see new orders and directory items.');
-            });
+            Alert.alert('Success', 'Demo data seeded successfully! You can now see new orders and directory items.');
         } catch (error: any) {
             console.error('Seeding error:', error);
-            import('react-native').then(({ Alert }) => {
-                Alert.alert('Error', error?.message || 'Failed to seed data');
-            });
+            Alert.alert('Error', error?.message || 'Failed to seed data');
         } finally {
             setSeeding(false);
         }
@@ -54,14 +50,10 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
         try {
             await supabaseService.updateProfile(user.id, { upi_id: upiId });
             setPaymentModalVisible(false);
-            import('react-native').then(({ Alert }) => {
-                Alert.alert('Success', 'Payment details updated successfully.');
-            });
+            Alert.alert('Success', 'Payment details updated successfully.');
         } catch (error: any) {
             console.error('Update error:', error);
-            import('react-native').then(({ Alert }) => {
-                Alert.alert('Error', error?.message || 'Failed to update payment details');
-            });
+            Alert.alert('Error', error?.message || 'Failed to update payment details');
         } finally {
             setUpdating(false);
         }
@@ -111,6 +103,17 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
                 },
                 { icon: <Database size={20} color={isDark ? '#818CF8' : '#4F46E5'} />, label: 'Backup & Restore', subtitle: 'Cloud sync', onPress: () => { }, badge: 'Soon' },
             ]
+        },
+        {
+            title: 'Initial Setup',
+            items: [
+                {
+                    icon: <Sparkles size={20} color={isDark ? '#818CF8' : '#4F46E5'} />,
+                    label: 'Seed Basic Data',
+                    subtitle: 'Initialize suggestions & contacts',
+                    onPress: () => setSeedConfirmVisible(true)
+                },
+            ]
         }
     ];
 
@@ -118,162 +121,162 @@ export default function Settings({ user, onLogout, navigation }: { user?: any; o
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
-                <View className="px-6 pt-4 pb-2">
-                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-1">Settings</Text>
-                    <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">App preferences & account</Text>
-                </View>
+                    <View className="px-6 pt-4 pb-2">
+                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-1">Settings</Text>
+                        <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">App preferences & account</Text>
+                    </View>
 
-                <ScrollView
-                    className="flex-1 px-6 mt-4"
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={{ paddingBottom: 120 }}
-                >
-                    {sections.map((section, idx) => (
-                        <View key={idx} className="mb-6">
-                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">{section.title}</Text>
-                            <Card className="px-0 py-0 overflow-hidden">
-                                {section.items.map((item, i) => (
-                                    <View key={i} className={cn(i < section.items.length - 1 && "border-b border-divider dark:border-divider-dark")}>
-                                        {item.type === 'switch' ? (
-                                            <View className="flex-row items-center justify-between px-4 py-4">
-                                                <View className="flex-row items-center">
+                    <ScrollView
+                        className="flex-1 px-6 mt-4"
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 120 }}
+                    >
+                        {sections.map((section, idx) => (
+                            <View key={idx} className="mb-6">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">{section.title}</Text>
+                                <Card className="px-0 py-0 overflow-hidden">
+                                    {section.items.map((item, i) => (
+                                        <View key={i} className={cn(i < section.items.length - 1 && "border-b border-divider dark:border-divider-dark")}>
+                                            {item.type === 'switch' ? (
+                                                <View className="flex-row items-center justify-between px-4 py-4">
+                                                    <View className="flex-row items-center">
+                                                        <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
+                                                            {item.icon}
+                                                        </View>
+                                                        <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.label}</Text>
+                                                    </View>
+                                                    <Switch
+                                                        value={item.value}
+                                                        onValueChange={item.onValueChange}
+                                                        trackColor={{ false: '#E5E7EB', true: isDark ? '#818CF8' : '#4F46E5' }}
+                                                        thumbColor="#FFFFFF"
+                                                    />
+                                                </View>
+                                            ) : (
+                                                <TouchableOpacity
+                                                    onPress={item.onPress}
+                                                    className="flex-row items-center px-4 py-4"
+                                                >
                                                     <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
                                                         {item.icon}
                                                     </View>
-                                                    <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.label}</Text>
-                                                </View>
-                                                <Switch
-                                                    value={item.value}
-                                                    onValueChange={item.onValueChange}
-                                                    trackColor={{ false: '#E5E7EB', true: isDark ? '#818CF8' : '#4F46E5' }}
-                                                    thumbColor="#FFFFFF"
-                                                />
-                                            </View>
-                                        ) : (
-                                            <TouchableOpacity
-                                                onPress={item.onPress}
-                                                className="flex-row items-center px-4 py-4"
-                                            >
-                                                <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
-                                                    {item.icon}
-                                                </View>
-                                                <View className="flex-1">
-                                                    <View className="flex-row items-center">
-                                                        <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.label}</Text>
-                                                        {item.badge && (
-                                                            <View className="ml-2 bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
-                                                                <Text className="text-accent font-sans-bold text-[8px] uppercase tracking-widest">{item.badge}</Text>
-                                                            </View>
-                                                        )}
+                                                    <View className="flex-1">
+                                                        <View className="flex-row items-center">
+                                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">{item.label}</Text>
+                                                            {item.badge && (
+                                                                <View className="ml-2 bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
+                                                                    <Text className="text-accent font-sans-bold text-[8px] uppercase tracking-widest">{item.badge}</Text>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                        {item.subtitle && <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5">{item.subtitle}</Text>}
                                                     </View>
-                                                    {item.subtitle && <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-0.5">{item.subtitle}</Text>}
-                                                </View>
-                                                <ChevronRight size={18} color="#9CA3AF" />
-                                            </TouchableOpacity>
-                                        )}
+                                                    <ChevronRight size={18} color="#9CA3AF" />
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
+                                    ))}
+                                </Card>
+                            </View>
+                        ))}
+
+                        <Card className="px-4 py-0 mb-6">
+                            <View className="flex-row items-center justify-between py-4">
+                                <View className="flex-row items-center">
+                                    <View className="w-10 h-10 bg-surface dark:bg-background-dark rounded-xl items-center justify-center mr-4">
+                                        <Info size={20} color="#9CA3AF" />
                                     </View>
-                                ))}
+                                    <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">Version</Text>
+                                </View>
+                                <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">1.0.0</Text>
+                            </View>
+                        </Card>
+
+                        <View className="mb-10">
+                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">Danger Zone</Text>
+                            <Card className="p-0 overflow-hidden border-red-500/20">
+                                <TouchableOpacity
+                                    onPress={onLogout}
+                                    activeOpacity={0.8}
+                                    className="flex-row items-center px-4 py-4 bg-red-500/5 dark:bg-red-500/10"
+                                >
+                                    <View className="w-10 h-10 bg-red-500/20 rounded-xl items-center justify-center mr-4">
+                                        <LogOut size={20} color="#EF4444" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-[#EF4444] font-sans-bold text-base">Sign Out</Text>
+                                        <Text className="text-red-500/60 font-sans text-xs mt-0.5">Securely log out of your account</Text>
+                                    </View>
+                                    <ChevronRight size={18} color="#EF4444" style={{ opacity: 0.5 }} />
+                                </TouchableOpacity>
                             </Card>
                         </View>
-                    ))}
+                    </ScrollView>
 
-                    <Card className="px-4 py-0 mb-6">
-                        <View className="flex-row items-center justify-between py-4">
-                            <View className="flex-row items-center">
-                                <View className="w-10 h-10 bg-surface dark:bg-background-dark rounded-xl items-center justify-center mr-4">
-                                    <Info size={20} color="#9CA3AF" />
-                                </View>
-                                <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base">Version</Text>
-                            </View>
-                            <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">1.0.0</Text>
-                        </View>
-                    </Card>
+                    <ConfirmDialog
+                        visible={seedConfirmVisible}
+                        title="Seed Demo Data?"
+                        message="This will add several realistic orders, customers, and products to your account for testing. This cannot be easily undone."
+                        type="info"
+                        confirmText="Yes, Seed Data"
+                        onConfirm={handleSeed}
+                        onCancel={() => setSeedConfirmVisible(false)}
+                        loading={seeding}
+                    />
 
-                    <View className="mb-10">
-                        <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">Danger Zone</Text>
-                        <Card className="p-0 overflow-hidden border-red-500/20">
-                            <TouchableOpacity
-                                onPress={onLogout}
-                                activeOpacity={0.8}
-                                className="flex-row items-center px-4 py-4 bg-red-500/5 dark:bg-red-500/10"
-                            >
-                                <View className="w-10 h-10 bg-red-500/20 rounded-xl items-center justify-center mr-4">
-                                    <LogOut size={20} color="#EF4444" />
+                    <Modal
+                        visible={paymentModalVisible}
+                        transparent
+                        animationType="fade"
+                        onRequestClose={() => setPaymentModalVisible(false)}
+                    >
+                        <View className="flex-1 bg-black/50 justify-center px-6">
+                            <Card className="p-6">
+                                <View className="flex-row justify-between items-center mb-6">
+                                    <View>
+                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">Payment Settings</Text>
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-1">Setup UPI for PDF statements</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
+                                        <X size={24} color={isDark ? '#9CA3AF' : '#6B7280'} />
+                                    </TouchableOpacity>
                                 </View>
-                                <View className="flex-1">
-                                    <Text className="text-[#EF4444] font-sans-bold text-base">Sign Out</Text>
-                                    <Text className="text-red-500/60 font-sans text-xs mt-0.5">Securely log out of your account</Text>
-                                </View>
-                                <ChevronRight size={18} color="#EF4444" style={{ opacity: 0.5 }} />
-                            </TouchableOpacity>
-                        </Card>
-                    </View>
-                </ScrollView>
 
-                <ConfirmDialog
-                    visible={seedConfirmVisible}
-                    title="Seed Demo Data?"
-                    message="This will add several realistic orders, customers, and products to your account for testing. This cannot be easily undone."
-                    type="info"
-                    confirmText="Yes, Seed Data"
-                    onConfirm={handleSeed}
-                    onCancel={() => setSeedConfirmVisible(false)}
-                    loading={seeding}
-                />
-
-                <Modal
-                    visible={paymentModalVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setPaymentModalVisible(false)}
-                >
-                    <View className="flex-1 bg-black/50 justify-center px-6">
-                        <Card className="p-6">
-                            <View className="flex-row justify-between items-center mb-6">
-                                <View>
-                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">Payment Settings</Text>
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-1">Setup UPI for PDF statements</Text>
+                                <View className="mb-6">
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-2 ml-1">UPI ID (VPA)</Text>
+                                    <View className="bg-background dark:bg-background-dark rounded-2xl border border-divider dark:border-white/5 px-4 py-4 flex-row items-center">
+                                        <TextInput
+                                            className="flex-1 text-primary dark:text-primary-dark font-sans-medium text-base"
+                                            placeholder="e.g. neetu@upi"
+                                            placeholderTextColor="#9CA3AF"
+                                            value={upiId}
+                                            onChangeText={setUpiId}
+                                            autoCapitalize="none"
+                                        />
+                                        {upiId.includes('@') && <BadgeCheck size={20} color="#10B981" />}
+                                    </View>
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] mt-2 ml-1 leading-4">
+                                        This ID will be used to generate a secure QR code on your shared statements.
+                                    </Text>
                                 </View>
-                                <TouchableOpacity onPress={() => setPaymentModalVisible(false)}>
-                                    <X size={24} color={isDark ? '#9CA3AF' : '#6B7280'} />
+
+                                <TouchableOpacity
+                                    onPress={handleUpdatePayment}
+                                    disabled={updating || !upiId.includes('@')}
+                                    style={{
+                                        height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+                                        backgroundColor: (updating || !upiId.includes('@')) ? 'rgba(79, 70, 229, 0.5)' : '#4F46E5',
+                                    }}
+                                >
+                                    {updating ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <Text className="text-white font-sans-bold text-base">Save Payment Details</Text>
+                                    )}
                                 </TouchableOpacity>
-                            </View>
-
-                            <View className="mb-6">
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-[10px] uppercase tracking-widest mb-2 ml-1">UPI ID (VPA)</Text>
-                                <View className="bg-background dark:bg-background-dark rounded-2xl border border-divider dark:border-white/5 px-4 py-4 flex-row items-center">
-                                    <TextInput
-                                        className="flex-1 text-primary dark:text-primary-dark font-sans-medium text-base"
-                                        placeholder="e.g. neetu@upi"
-                                        placeholderTextColor="#9CA3AF"
-                                        value={upiId}
-                                        onChangeText={setUpiId}
-                                        autoCapitalize="none"
-                                    />
-                                    {upiId.includes('@') && <BadgeCheck size={20} color="#10B981" />}
-                                </View>
-                                <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] mt-2 ml-1 leading-4">
-                                    This ID will be used to generate a secure QR code on your shared statements.
-                                </Text>
-                            </View>
-
-                            <TouchableOpacity
-                                onPress={handleUpdatePayment}
-                                disabled={updating || !upiId.includes('@')}
-                                style={{
-                                    height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-                                    backgroundColor: (updating || !upiId.includes('@')) ? 'rgba(79, 70, 229, 0.5)' : '#4F46E5',
-                                }}
-                            >
-                                {updating ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <Text className="text-white font-sans-bold text-base">Save Payment Details</Text>
-                                )}
-                            </TouchableOpacity>
-                        </Card>
-                    </View>
-                </Modal>
+                            </Card>
+                        </View>
+                    </Modal>
                 </View>
             </SafeAreaView>
         </Background>

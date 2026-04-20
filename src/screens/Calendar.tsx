@@ -125,156 +125,162 @@ export default function Calendar({ navigation }: any) {
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
-                <ScrollView
-                    className="flex-1 px-6"
-                    showsVerticalScrollIndicator={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={loading}
-                            onRefresh={loadEvents}
-                            tintColor={isDark ? '#818CF8' : '#4F46E5'}
-                        />
-                    }
-                >
-                    <View className="flex-row items-center justify-between mb-6 pt-2">
-                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl">Business Calendar</Text>
-                        <View className="p-2.5 rounded-2xl bg-white/50 dark:bg-white/5 border border-black/5 dark:border-white/5">
-                            <CalendarIcon size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
-                        </View>
-                    </View>
-
-                    {/* Month Selector */}
-                    <View className="flex-row items-center justify-between mb-6 bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-sm border border-black/5 dark:border-white/5">
-                        <TouchableOpacity
-                            onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
-                            className="p-3"
-                        >
-                            <ChevronLeft size={20} color={isDark ? '#94A3B8' : '#64748B'} />
-                        </TouchableOpacity>
-                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-lg">
-                            {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
-                            className="p-3"
-                        >
-                            <ChevronRight size={20} color={isDark ? '#94A3B8' : '#64748B'} />
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Calendar Grid */}
-                    <View className="bg-white dark:bg-slate-800 p-4 rounded-3xl shadow-md border border-black/5 dark:border-white/5">
-                        <View className="flex-row mb-4">
-                            {days.map((d, i) => (
-                                <Text key={i} className="flex-1 text-center text-secondary dark:text-secondary-dark font-sans-bold text-xs">
-                                    {d}
-                                </Text>
-                            ))}
+                    <ScrollView
+                        className="flex-1 px-6"
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={loading}
+                                onRefresh={loadEvents}
+                                tintColor={isDark ? '#818CF8' : '#4F46E5'}
+                            />
+                        }
+                    >
+                        <View className="flex-row items-center justify-between mb-6 pt-2">
+                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl">Business Calendar</Text>
+                            <View className="p-2.5 rounded-2xl bg-white/50 dark:bg-white/5 border border-black/5 dark:border-white/5">
+                                <CalendarIcon size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
+                            </View>
                         </View>
 
-                        <View className="flex-row flex-wrap">
-                            {calendarDays.map((day, i) => (
-                                <View key={i} style={{ width: '14.28%', height: 50, padding: 2 }}>
-                                    {day && (
-                                        <TouchableOpacity
-                                            onPress={() => handleDatePress(day)}
-                                            style={{
-                                                flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12,
-                                                backgroundColor: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-                                                    ? '#4F46E5' : 'transparent',
-                                            }}
-                                        >
-                                            <Text style={{
-                                                fontSize: 14,
-                                                fontFamily: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-                                                    ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_400Regular',
-                                                color: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
-                                                    ? '#FFFFFF' : (isDark ? '#E2E8F0' : '#1E293B'),
-                                            }}>
-                                                {day}
-                                            </Text>
-                                        </TouchableOpacity>
+                        {/* Month Selector */}
+                        <View
+                            className="flex-row items-center justify-between mb-6 bg-white dark:bg-slate-800 p-2 rounded-2xl border border-black/5 dark:border-white/5"
+                            style={{ elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
+                                className="p-3"
+                            >
+                                <ChevronLeft size={20} color={isDark ? '#94A3B8' : '#64748B'} />
+                            </TouchableOpacity>
+                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-lg">
+                                {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
+                                className="p-3"
+                            >
+                                <ChevronRight size={20} color={isDark ? '#94A3B8' : '#64748B'} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Calendar Grid */}
+                        <View
+                            className="bg-white dark:bg-slate-800 p-4 rounded-3xl border border-black/5 dark:border-white/5"
+                            style={{ elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 }}
+                        >
+                            <View className="flex-row mb-4">
+                                {days.map((d, i) => (
+                                    <Text key={i} className="flex-1 text-center text-secondary dark:text-secondary-dark font-sans-bold text-xs">
+                                        {d}
+                                    </Text>
+                                ))}
+                            </View>
+
+                            <View className="flex-row flex-wrap">
+                                {calendarDays.map((day, i) => (
+                                    <View key={i} style={{ width: '14.28%', height: 50, padding: 2 }}>
+                                        {day && (
+                                            <TouchableOpacity
+                                                onPress={() => handleDatePress(day)}
+                                                style={{
+                                                    flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 12,
+                                                    backgroundColor: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                                                        ? '#4F46E5' : 'transparent',
+                                                }}
+                                            >
+                                                <Text style={{
+                                                    fontSize: 14,
+                                                    fontFamily: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                                                        ? 'PlusJakartaSans_700Bold' : 'PlusJakartaSans_400Regular',
+                                                    color: selectedDate === `${viewDate.getFullYear()}-${(viewDate.getMonth() + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+                                                        ? '#FFFFFF' : (isDark ? '#E2E8F0' : '#1E293B'),
+                                                }}>
+                                                    {day}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                ))}
+                            </View>
+                        </View>
+
+                        {/* Selected Day Legend / Detail */}
+                        <View className="mt-6" style={{ marginBottom: isWeb ? 40 : 100 }}>
+                            {selectedDate ? (
+                                <View>
+                                    <View className="flex-row justify-between items-center mb-4 ml-1">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-widest">
+                                            Events for {selectedDate}
+                                        </Text>
+                                        <View className="flex-row gap-3">
+                                            <View className="flex-row items-center">
+                                                <Text className="text-indigo-500 font-sans-bold text-xs">{selectedEvents.filter(e => e.type !== 'Payment').length} Orders</Text>
+                                            </View>
+                                            <View className="flex-row items-center">
+                                                <Text className="text-emerald-500 font-sans-bold text-xs">{selectedEvents.filter(e => e.type === 'Payment').length} Payments</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                    {selectedEvents.length > 0 ? (
+                                        selectedEvents.map((item, idx) => (
+                                            <TouchableOpacity
+                                                key={idx}
+                                                onPress={() => item.type !== 'Payment' && navigation.navigate('OrderDetail', { orderId: item.id })}
+                                            >
+                                                <Card className="mb-3 p-4">
+                                                    <View className="flex-row items-center justify-between">
+                                                        <View className="flex-row items-center">
+                                                            <View className={cn(
+                                                                "p-2 rounded-xl mr-3",
+                                                                item.type === 'Payment' ? "bg-emerald-500/10" : "bg-indigo-500/10"
+                                                            )}>
+                                                                {item.type === 'Payment' ?
+                                                                    <Wallet size={16} color="#10B981" /> :
+                                                                    <ClipboardList size={16} color="#4F46E5" />
+                                                                }
+                                                            </View>
+                                                            <View>
+                                                                <Text className="text-primary dark:text-primary-dark font-sans-bold">{item.customerName || item.supplierName}</Text>
+                                                                <Text className="text-secondary dark:text-secondary-dark text-[11px]">
+                                                                    {item.type} • {item.productName || 'No Item'}
+                                                                    {item.currentDisplayStatus && (
+                                                                        <Text className="text-accent font-sans-bold"> • {item.currentDisplayStatus}</Text>
+                                                                    )}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                        <Text className={cn(
+                                                            "font-sans-bold",
+                                                            item.type === 'Payment' ? "text-emerald-500" : "text-primary dark:text-primary-dark"
+                                                        )}>
+                                                            ₹{item.amount?.toLocaleString() || item.sellingPrice?.toLocaleString()}
+                                                        </Text>
+                                                    </View>
+                                                </Card>
+                                            </TouchableOpacity>
+                                        ))
+                                    ) : (
+                                        <View className="py-8 items-center bg-white/30 dark:bg-white/5 rounded-3xl border border-dashed border-black/10 dark:border-white/10">
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs italic">No entries for this date</Text>
+                                        </View>
                                     )}
                                 </View>
-                            ))}
+                            ) : (
+                                <View className="flex-row justify-around p-4 bg-white/50 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
+                                    <View className="flex-row items-center">
+                                        <View className="w-2 h-2 rounded-full bg-indigo-500 mr-2" />
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Orders</Text>
+                                    </View>
+                                    <View className="flex-row items-center">
+                                        <View className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Payments</Text>
+                                    </View>
+                                </View>
+                            )}
                         </View>
-                    </View>
-
-                    {/* Selected Day Legend / Detail */}
-                    <View className="mt-6" style={{ marginBottom: isWeb ? 40 : 100 }}>
-                        {selectedDate ? (
-                            <View>
-                                <View className="flex-row justify-between items-center mb-4 ml-1">
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-widest">
-                                        Events for {selectedDate}
-                                    </Text>
-                                    <View className="flex-row gap-3">
-                                        <View className="flex-row items-center">
-                                            <Text className="text-indigo-500 font-sans-bold text-xs">{selectedEvents.filter(e => e.type !== 'Payment').length} Orders</Text>
-                                        </View>
-                                        <View className="flex-row items-center">
-                                            <Text className="text-emerald-500 font-sans-bold text-xs">{selectedEvents.filter(e => e.type === 'Payment').length} Payments</Text>
-                                        </View>
-                                    </View>
-                                </View>
-                                {selectedEvents.length > 0 ? (
-                                    selectedEvents.map((item, idx) => (
-                                        <TouchableOpacity
-                                            key={idx}
-                                            onPress={() => item.type !== 'Payment' && navigation.navigate('OrderDetail', { orderId: item.id })}
-                                        >
-                                            <Card className="mb-3 p-4">
-                                                <View className="flex-row items-center justify-between">
-                                                    <View className="flex-row items-center">
-                                                        <View className={cn(
-                                                            "p-2 rounded-xl mr-3",
-                                                            item.type === 'Payment' ? "bg-emerald-500/10" : "bg-indigo-500/10"
-                                                        )}>
-                                                            {item.type === 'Payment' ?
-                                                                <Wallet size={16} color="#10B981" /> :
-                                                                <ClipboardList size={16} color="#4F46E5" />
-                                                            }
-                                                        </View>
-                                                        <View>
-                                                            <Text className="text-primary dark:text-primary-dark font-sans-bold">{item.customerName || item.supplierName}</Text>
-                                                            <Text className="text-secondary dark:text-secondary-dark text-[11px]">
-                                                                {item.type} • {item.productName || 'No Item'}
-                                                                {item.currentDisplayStatus && (
-                                                                    <Text className="text-accent font-sans-bold"> • {item.currentDisplayStatus}</Text>
-                                                                )}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                    <Text className={cn(
-                                                        "font-sans-bold",
-                                                        item.type === 'Payment' ? "text-emerald-500" : "text-primary dark:text-primary-dark"
-                                                    )}>
-                                                        ₹{item.amount?.toLocaleString() || item.sellingPrice?.toLocaleString()}
-                                                    </Text>
-                                                </View>
-                                            </Card>
-                                        </TouchableOpacity>
-                                    ))
-                                ) : (
-                                    <View className="py-8 items-center bg-white/30 dark:bg-white/5 rounded-3xl border border-dashed border-black/10 dark:border-white/10">
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs italic">No entries for this date</Text>
-                                    </View>
-                                )}
-                            </View>
-                        ) : (
-                            <View className="flex-row justify-around p-4 bg-white/50 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
-                                <View className="flex-row items-center">
-                                    <View className="w-2 h-2 rounded-full bg-indigo-500 mr-2" />
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Orders</Text>
-                                </View>
-                                <View className="flex-row items-center">
-                                    <View className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
-                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Payments</Text>
-                                </View>
-                            </View>
-                        )}
-                    </View>
-                </ScrollView>
+                    </ScrollView>
                 </View>
             </SafeAreaView>
         </Background>

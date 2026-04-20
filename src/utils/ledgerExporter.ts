@@ -10,7 +10,8 @@ export const ledgerExporter = {
         transactions: LedgerEntry[],
         upiId?: string,
         businessName: string = 'Neetu Collection',
-        isUdharOnly: boolean = false
+        isUdharOnly: boolean = false,
+        personType: 'Customer' | 'Vendor' | 'Pickup Person' = 'Customer'
     ) {
         // Calculate Total Due (Sum of all listed transactions)
         const totalDue = transactions.reduce((sum, t) => sum + t.amount, 0);
@@ -43,20 +44,31 @@ export const ledgerExporter = {
                 day: '2-digit', month: 'short'
             });
             const type = t.transactionType;
-            const desc = t.orderProductName ? `${type}: ${t.orderProductName}` : (t.notes || type);
+            let displayType: string = type;
+            if (type === 'PaymentIn') displayType = 'Payment Out';
+            else if (type === 'PaymentOut') displayType = 'Payment In';
+
+            const desc = t.orderProductName ? `${t.orderProductName}` : (t.notes || displayType);
+            const qty = t.orderQuantity || (t.orderProductName ? 1 : '-');
             const amount = t.amount;
             const isSettled = t.isSettled;
+
+            // For Customer: Positive is Owed (Red), Negative is Paid (Green)
+            // For Vendor/Pickup: Negative is Owed (Red), Positive is Paid (Green)
+            let isOwed = personType === 'Customer' ? amount >= 0 : amount < 0;
+            const amountColor = isUdharOnly ? '#1e293b' : (isOwed ? '#ef4444' : '#10b981');
 
             return `
                 <tr style="background-color: ${index % 2 === 0 ? '#ffffff' : '#f8fafc'};">
                     <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #64748b;">${date}</td>
                     <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0;">
                         <div style="font-weight: 600; color: #1e293b; font-size: 13px;">${desc}</div>
-                        ${t.orderStatus ? `<div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">Order Status: ${t.orderStatus}</div>` : ''}
+                        ${t.orderStatus ? `<div style="font-size: 10px; color: #94a3b8; margin-top: 2px;">Status: ${t.orderStatus}</div>` : ''}
                     </td>
+                    <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 12px;">${qty}</td>
                     <td style="padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: right;">
-                        <div style="font-weight: 700; color: ${amount >= 0 ? '#10b981' : '#ef4444'}; font-size: 13px;">
-                            ${amount >= 0 ? '+' : ''}${Math.abs(amount).toLocaleString()}
+                        <div style="font-weight: 700; color: ${amountColor}; font-size: 13px;">
+                            ${Math.abs(amount).toLocaleString()}
                         </div>
                         ${isSettled ? '<div style="font-size: 9px; color: #10b981; font-weight: bold; text-transform: uppercase; margin-top: 2px;">Settled</div>' : ''}
                     </td>
@@ -65,7 +77,7 @@ export const ledgerExporter = {
         }).join('');
 
         const upiAddress = upiId || '';
-        const upiUri = `upi://pay?pa=${upiAddress}&pn=${encodeURIComponent(businessName)}&cu=INR`;
+        const upiUri = `upi://pay?pa=${upiAddress}&pn=${encodeURIComponent(businessName)}&am=${Math.abs(totalDue).toFixed(2)}&cu=INR&tr=STMT${now.getTime()}`;
         const qrCodeUrl = upiAddress ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}&bgcolor=ffffff` : null;
 
         const html = `
@@ -87,11 +99,11 @@ export const ledgerExporter = {
                         .meta { text-align: right; }
                         .doc-type { font-size: 16px; font-weight: 800; color: #4f46e5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
                         .meta-item { font-size: 11px; color: #94a3b8; }
-
+ 
                         .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
                         .section-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
                         .person-name { font-size: 18px; font-weight: 700; color: #0f172a; }
-
+ 
                         table { width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 20px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
                         thead th { background: #f8fafc; color: #475569; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; padding: 12px 15px; border-bottom: 1px solid #e2e8f0; text-align: left; }
                         
@@ -100,7 +112,7 @@ export const ledgerExporter = {
                         .total-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.8; margin-bottom: 5px; }
                         .total-amount { font-size: 28px; font-weight: 800; }
                         .total-status { font-size: 10px; margin-top: 5px; font-weight: 600; text-transform: uppercase; color: ${totalDue >= 0 ? '#10b981' : '#fca5a5'}; }
-
+ 
                         .footer { display: flex; justify-content: space-between; align-items: flex-end; padding-top: 30px; border-top: 1px solid #f1f5f9; }
                         .qr-box { background: white; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; display: inline-block; }
                         .qr-image { width: 120px; height: 120px; display: block; }
@@ -125,20 +137,21 @@ export const ledgerExporter = {
                             <div class="meta-item">Date: ${dateStr}</div>
                         </div>
                     </div>
-
+ 
                     <div class="details-grid">
                         <div>
                             <div class="section-label">Summary For</div>
                             <div class="person-name">${personName}</div>
                         </div>
                     </div>
-
+ 
                     <table>
                         <thead>
                             <tr>
                                 <th style="width: 15%;">Date</th>
-                                <th style="width: 60%;">Description</th>
-                                <th style="width: 25%; text-align: right;">Amount (₹)</th>
+                                <th style="width: 50%;">Description</th>
+                                <th style="width: 15%; text-align: center;">Qty</th>
+                                <th style="width: 20%; text-align: right;">Amount (₹)</th>
                             </tr>
                         </thead>
                         <tbody>

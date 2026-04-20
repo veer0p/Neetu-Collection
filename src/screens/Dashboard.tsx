@@ -106,7 +106,7 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                     ...t,
                     product: t.productName,
                     customer: t.customerName,
-                    amount: t.sellingPrice,
+                    amount: Number(t.sellingPrice) + Number(t.shippingCharges || 0) + Number(t.pickupCharges || 0),
                     payment: t.customerPaymentStatus,
                 }));
 

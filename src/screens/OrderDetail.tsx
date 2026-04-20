@@ -79,7 +79,7 @@ export default function OrderDetail({ route, navigation }: any) {
         );
     }
 
-    const margin = (order.sellingPrice || 0) - (order.originalPrice || 0) - (order.pickupCharges || 0) - (order.shippingCharges || 0);
+    const margin = (order.sellingPrice || 0) + (order.shippingCharges || 0) + (order.pickupCharges || 0) - (order.originalPrice || 0) - (order.pickupCharges || 0) - (order.shippingCharges || 0);
 
     const getStatusStyle = (s: string) => {
         switch (s) {
@@ -96,174 +96,178 @@ export default function OrderDetail({ route, navigation }: any) {
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
-                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}>
-                    {/* Header */}
-                    <View className="flex-row items-center px-6 pt-4 pb-2">
-                        <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
-                            <ChevronLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
-                        </TouchableOpacity>
-                        <View className="flex-1">
-                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{order.productName}</Text>
-                            <View className="flex-row items-center gap-2 mt-1">
-                                <Text className={cn("font-sans-bold text-xs px-2 py-0.5 rounded-full", getStatusStyle(order.status))}>
-                                    {order.status}
-                                </Text>
-                                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{order.date}</Text>
+                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: isWeb ? 40 : 100 }}>
+                        {/* Header */}
+                        <View className="flex-row items-center px-6 pt-4 pb-2">
+                            <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl mr-3">
+                                <ChevronLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
+                            </TouchableOpacity>
+                            <View className="flex-1">
+                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl" numberOfLines={1}>{order.productName}</Text>
+                                <View className="flex-row items-center gap-2 mt-1">
+                                    <Text className={cn("font-sans-bold text-xs px-2 py-0.5 rounded-full", getStatusStyle(order.status))}>
+                                        {order.status}
+                                    </Text>
+                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{order.date}</Text>
+                                </View>
                             </View>
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('AddEntry' as never, { orderId: order.id, orderData: order } as never)}
+                                className="p-2 bg-accent/10 rounded-xl mr-2"
+                            >
+                                <Edit3 color={isDark ? '#818CF8' : '#4F46E5'} size={18} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setDeleteVisible(true)}
+                                disabled={deleting}
+                                className="p-2 bg-danger/10 rounded-xl"
+                            >
+                                <Trash2 color="#EF4444" size={18} />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('AddEntry' as never, { orderId: order.id, orderData: order } as never)}
-                            className="p-2 bg-accent/10 rounded-xl mr-2"
-                        >
-                            <Edit3 color={isDark ? '#818CF8' : '#4F46E5'} size={18} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setDeleteVisible(true)}
-                            disabled={deleting}
-                            className="p-2 bg-danger/10 rounded-xl"
-                        >
-                            <Trash2 color="#EF4444" size={18} />
-                        </TouchableOpacity>
-                    </View>
 
-                    <View className="px-6 mt-4">
-                        {/* Summary Card */}
-                        <Card className="p-5 mb-4 items-center">
-                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-wider mb-1">Net Margin</Text>
-                            <Text className={cn("text-3xl font-sans-bold", margin >= 0 ? "text-success" : "text-danger")}>
-                                ₹{margin.toLocaleString()}
-                            </Text>
-                        </Card>
+                        <View className="px-6 mt-4">
+                            {/* Summary Card */}
+                            <Card className="p-5 mb-4 items-center">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-wider mb-1">Net Margin</Text>
+                                <Text className={cn("text-3xl font-sans-bold", margin >= 0 ? "text-success" : "text-danger")}>
+                                    ₹{margin.toLocaleString()}
+                                </Text>
+                            </Card>
 
-                        {/* Payment Status — Read Only */}
-                        <View className="mb-4">
-                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-2 ml-1">Payment Status</Text>
-                            <Card className="p-4">
-                                {[
-                                    { label: 'Customer', status: order.customerPaymentStatus },
-                                    { label: 'Vendor', status: order.vendorPaymentStatus },
-                                    ...(order.pickupPersonName ? [{ label: 'Pickup', status: order.pickupPaymentStatus || 'Udhar' }] : []),
-                                ].map((item, idx, arr) => (
-                                    <View key={item.label} className={cn("flex-row items-center justify-between py-3", idx < arr.length - 1 && "border-b border-divider dark:border-divider-dark")}>
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">{item.label}</Text>
-                                        <View style={{
-                                            flexDirection: 'row', alignItems: 'center', gap: 6,
-                                            paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99,
-                                            backgroundColor: item.status === 'Paid' ? 'rgba(16,185,129,0.10)' : 'rgba(245,158,11,0.10)',
-                                            borderWidth: 1,
-                                            borderColor: item.status === 'Paid' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)',
-                                        }}>
+                            {/* Payment Status — Read Only */}
+                            <View className="mb-4">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-2 ml-1">Payment Status</Text>
+                                <Card className="p-4">
+                                    {[
+                                        { label: 'Customer', status: order.customerPaymentStatus },
+                                        { label: 'Vendor', status: order.vendorPaymentStatus },
+                                        ...(order.pickupPersonName ? [{ label: 'Pickup', status: order.pickupPaymentStatus || 'Udhar' }] : []),
+                                    ].map((item, idx, arr) => (
+                                        <View key={item.label} className={cn("flex-row items-center justify-between py-3", idx < arr.length - 1 && "border-b border-divider dark:border-divider-dark")}>
+                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-sm">{item.label}</Text>
                                             <View style={{
-                                                width: 6, height: 6, borderRadius: 99,
-                                                backgroundColor: item.status === 'Paid' ? '#10B981' : '#F59E0B',
-                                            }} />
-                                            <Text style={{
-                                                fontFamily: 'PlusJakartaSans_600SemiBold',
-                                                fontSize: 12,
-                                                color: item.status === 'Paid' ? '#10B981' : '#F59E0B',
+                                                flexDirection: 'row', alignItems: 'center', gap: 6,
+                                                paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99,
+                                                backgroundColor: item.status === 'Paid' ? 'rgba(16,185,129,0.10)' : 'rgba(245,158,11,0.10)',
+                                                borderWidth: 1,
+                                                borderColor: item.status === 'Paid' ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)',
                                             }}>
-                                                {item.status || 'Udhar'}
+                                                <View style={{
+                                                    width: 6, height: 6, borderRadius: 99,
+                                                    backgroundColor: item.status === 'Paid' ? '#10B981' : '#F59E0B',
+                                                }} />
+                                                <Text style={{
+                                                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                                                    fontSize: 12,
+                                                    color: item.status === 'Paid' ? '#10B981' : '#F59E0B',
+                                                }}>
+                                                    {item.status || 'Udhar'}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ))}
+                                </Card>
+                            </View>
+
+
+                            {/* Details */}
+                            <Card className="p-4 mb-4">
+                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-base mb-2">Order Details</Text>
+                                <InfoRow label="Product" value={order.productName} />
+                                <InfoRow label="Quantity" value={order.quantity?.toString() || '1'} />
+                                <InfoRow label="Customer" value={order.customerName} />
+                                <InfoRow label="Vendor" value={order.vendorName} />
+                                {order.pickupPersonName && <InfoRow label="Pickup" value={order.pickupPersonName} />}
+                                {order.unitOriginalPrice > 0 && <InfoRow label="Unit Cost" value={`₹${Number(order.unitOriginalPrice).toLocaleString()}`} />}
+                                {order.unitSellingPrice > 0 && <InfoRow label="Unit Sales" value={`₹${Number(order.unitSellingPrice).toLocaleString()}`} />}
+                                <InfoRow label="Total Cost" value={`₹${Number(order.originalPrice).toLocaleString()}`} />
+                                <InfoRow label="Total Sales" value={`₹${Number(order.sellingPrice).toLocaleString()}`} />
+                                {order.shippingCharges > 0 && <InfoRow label="Shipping" value={`₹${Number(order.shippingCharges).toLocaleString()}`} valueColor="text-danger" />}
+                                <InfoRow label="Total Bill (Receivable)" value={`₹${(Number(order.sellingPrice) + Number(order.shippingCharges || 0) + Number(order.pickupCharges || 0)).toLocaleString()}`} valueColor="text-success" />
+                                {order.pickupCharges > 0 && <InfoRow label="Pickup Charges" value={`₹${Number(order.pickupCharges).toLocaleString()}`} valueColor="text-danger" />}
+                            </Card>
+
+                            {(order.trackingId || order.courierName) && (
+                                <Card className="p-4 mb-4">
+                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-base mb-2">Shipping Info</Text>
+                                    {order.trackingId && <InfoRow label="Tracking ID" value={order.trackingId} />}
+                                    {order.courierName && <InfoRow label="Courier" value={order.courierName} />}
+                                </Card>
+                            )}
+
+                            {/* Status Timeline */}
+                            <View className="mt-6 mb-2">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-4 ml-1">Status Timeline</Text>
+                                <Card className="p-5">
+                                    {order.statusHistory && order.statusHistory.length > 0 ? (
+                                        order.statusHistory.map((history: any, idx: number) => (
+                                            <View key={idx} className="flex-row">
+                                                <View className="items-center mr-4">
+                                                    <View className={cn(
+                                                        "w-3 h-3 rounded-full z-10",
+                                                        idx === order.statusHistory.length - 1 ? "bg-accent" : "bg-divider dark:bg-divider-dark"
+                                                    )} />
+                                                    {idx < order.statusHistory.length - 1 && (
+                                                        <View className="w-0.5 flex-1 bg-divider dark:bg-divider-dark my-1" />
+                                                    )}
+                                                </View>
+                                                <View className="flex-1 pb-6">
+                                                    <View className="flex-row justify-between items-center mb-1">
+                                                        <Text className={cn(
+                                                            "font-sans-bold text-sm",
+                                                            idx === order.statusHistory.length - 1 ? "text-primary dark:text-primary-dark" : "text-secondary dark:text-secondary-dark"
+                                                        )}>
+                                                            {history.status}
+                                                        </Text>
+                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">
+                                                            {new Date(history.date).toLocaleDateString('en-GB')} {new Date(history.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                                        </Text>
+                                                    </View>
+                                                    {idx === order.statusHistory.length - 1 && (
+                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Current Status</Text>
+                                                    )}
+                                                </View>
+                                            </View>
+                                        ))
+                                    ) : (
+                                        <View className="flex-row items-center py-2">
+                                            <View className="w-3 h-3 rounded-full bg-accent mr-4" />
+                                            <View className="flex-1">
+                                                <Text className="font-sans-bold text-sm text-primary dark:text-primary-dark">{order.status}</Text>
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Initial recorded status</Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                </Card>
+                            </View>
+
+                            {/* Ledger History */}
+                            <View className="mt-2">
+                                <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">Ledger History</Text>
+                                {loading ? (
+                                    <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} />
+                                ) : (
+                                    ledgerEntries.map((entry, idx) => (
+                                        <View key={entry.id} className={cn("flex-row items-center py-4 bg-surface dark:bg-surface-dark px-4 rounded-2xl mb-2 border border-divider dark:border-divider-dark")}>
+                                            <View className={cn("w-8 h-8 rounded-full items-center justify-center mr-3",
+                                                entry.amount > 0 ? "bg-success/10" : "bg-danger/10"
+                                            )}>
+                                                {entry.amount > 0 ? <ArrowDownLeft size={16} color="#10B981" /> : <ArrowUpRight size={16} color="#EF4444" />}
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">{entry.transactionType}</Text>
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{entry.personName || 'Account'}</Text>
+                                            </View>
+                                            <Text className={cn("font-sans-bold text-sm", entry.amount > 0 ? "text-success" : "text-danger")}>
+                                                {entry.amount > 0 ? '+' : '-'}₹{Math.abs(entry.amount).toLocaleString()}
                                             </Text>
                                         </View>
-                                    </View>
-                                ))}
-                            </Card>
-                        </View>
-
-
-                        {/* Details */}
-                        <Card className="p-4 mb-4">
-                            <Text className="text-primary dark:text-primary-dark font-sans-bold text-base mb-2">Order Details</Text>
-                            <InfoRow label="Product" value={order.productName} />
-                            <InfoRow label="Customer" value={order.customerName} />
-                            <InfoRow label="Vendor" value={order.vendorName} />
-                            {order.pickupPersonName && <InfoRow label="Pickup" value={order.pickupPersonName} />}
-                            <InfoRow label="Original Price" value={`₹${Number(order.originalPrice).toLocaleString()}`} />
-                            <InfoRow label="Selling Price" value={`₹${Number(order.sellingPrice).toLocaleString()}`} valueColor="text-success" />
-                            {order.pickupCharges > 0 && <InfoRow label="Pickup Charges" value={`₹${Number(order.pickupCharges).toLocaleString()}`} valueColor="text-danger" />}
-                            {order.shippingCharges > 0 && <InfoRow label="Shipping" value={`₹${Number(order.shippingCharges).toLocaleString()}`} valueColor="text-danger" />}
-                        </Card>
-
-                        {(order.trackingId || order.courierName) && (
-                            <Card className="p-4 mb-4">
-                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-base mb-2">Shipping Info</Text>
-                                {order.trackingId && <InfoRow label="Tracking ID" value={order.trackingId} />}
-                                {order.courierName && <InfoRow label="Courier" value={order.courierName} />}
-                            </Card>
-                        )}
-
-                        {/* Status Timeline */}
-                        <View className="mt-6 mb-2">
-                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-4 ml-1">Status Timeline</Text>
-                            <Card className="p-5">
-                                {order.statusHistory && order.statusHistory.length > 0 ? (
-                                    order.statusHistory.map((history: any, idx: number) => (
-                                        <View key={idx} className="flex-row">
-                                            <View className="items-center mr-4">
-                                                <View className={cn(
-                                                    "w-3 h-3 rounded-full z-10",
-                                                    idx === order.statusHistory.length - 1 ? "bg-accent" : "bg-divider dark:bg-divider-dark"
-                                                )} />
-                                                {idx < order.statusHistory.length - 1 && (
-                                                    <View className="w-0.5 flex-1 bg-divider dark:bg-divider-dark my-1" />
-                                                )}
-                                            </View>
-                                            <View className="flex-1 pb-6">
-                                                <View className="flex-row justify-between items-center mb-1">
-                                                    <Text className={cn(
-                                                        "font-sans-bold text-sm",
-                                                        idx === order.statusHistory.length - 1 ? "text-primary dark:text-primary-dark" : "text-secondary dark:text-secondary-dark"
-                                                    )}>
-                                                        {history.status}
-                                                    </Text>
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">
-                                                        {new Date(history.date).toLocaleDateString('en-GB')} {new Date(history.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                                                    </Text>
-                                                </View>
-                                                {idx === order.statusHistory.length - 1 && (
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Current Status</Text>
-                                                )}
-                                            </View>
-                                        </View>
                                     ))
-                                ) : (
-                                    <View className="flex-row items-center py-2">
-                                        <View className="w-3 h-3 rounded-full bg-accent mr-4" />
-                                        <View className="flex-1">
-                                            <Text className="font-sans-bold text-sm text-primary dark:text-primary-dark">{order.status}</Text>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Initial recorded status</Text>
-                                        </View>
-                                    </View>
                                 )}
-                            </Card>
+                            </View>
                         </View>
-
-                        {/* Ledger History */}
-                        <View className="mt-2">
-                            <Text className="text-secondary dark:text-secondary-dark font-sans-bold text-xs uppercase tracking-wider mb-3 ml-1">Ledger History</Text>
-                            {loading ? (
-                                <ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} />
-                            ) : (
-                                ledgerEntries.map((entry, idx) => (
-                                    <View key={entry.id} className={cn("flex-row items-center py-4 bg-surface dark:bg-surface-dark px-4 rounded-2xl mb-2 border border-divider dark:border-divider-dark")}>
-                                        <View className={cn("w-8 h-8 rounded-full items-center justify-center mr-3",
-                                            entry.amount > 0 ? "bg-success/10" : "bg-danger/10"
-                                        )}>
-                                            {entry.amount > 0 ? <ArrowDownLeft size={16} color="#10B981" /> : <ArrowUpRight size={16} color="#EF4444" />}
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm">{entry.transactionType}</Text>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{entry.personName || 'Account'}</Text>
-                                        </View>
-                                        <Text className={cn("font-sans-bold text-sm", entry.amount > 0 ? "text-success" : "text-danger")}>
-                                            {entry.amount > 0 ? '+' : '-'}₹{Math.abs(entry.amount).toLocaleString()}
-                                        </Text>
-                                    </View>
-                                ))
-                            )}
-                        </View>
-                    </View>
-                </ScrollView>
+                    </ScrollView>
                 </View>
 
                 <ConfirmDialog

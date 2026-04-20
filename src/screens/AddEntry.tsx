@@ -87,6 +87,7 @@ export default function AddEntry({ route, navigation }: any) {
         productName: '', vendorName: '', customerName: '', pickupPersonName: '',
         productId: '', customerId: '', vendorId: '', pickupPersonId: '',
         originalPrice: '', sellingPrice: '', shippingCharges: '', pickupCharges: '',
+        quantity: '1', unitOriginalPrice: '', unitSellingPrice: '',
         status: 'Booked' as OrderStatus, trackingId: '', courierName: '', notes: '',
         customerPaymentStatus: 'Udhar' as 'Paid' | 'Udhar',
         vendorPaymentStatus: 'Udhar' as string,
@@ -115,6 +116,9 @@ export default function AddEntry({ route, navigation }: any) {
         // New simplified vendor payment logic
         vendorPaymentStatus: editingOrder?.paidByDriver ? 'DriverPaid' : ((editingOrder?.vendorPaymentStatus as 'Paid' | 'Udhar') || 'Udhar'),
         pickupPaymentStatus: (editingOrder?.pickupPaymentStatus as 'Paid' | 'Udhar') || 'Udhar',
+        quantity: editingOrder?.quantity?.toString() || '1',
+        unitOriginalPrice: editingOrder?.unitOriginalPrice?.toString() || editingOrder?.originalPrice?.toString() || '',
+        unitSellingPrice: editingOrder?.unitSellingPrice?.toString() || editingOrder?.sellingPrice?.toString() || '',
         date: editingOrder?.date || new Date().toLocaleDateString('en-GB') // DD/MM/YYYY
     } : emptyForm);
 
@@ -131,6 +135,8 @@ export default function AddEntry({ route, navigation }: any) {
         }
     }, [editingOrder]));
 
+    // Remove dynamic keyboard listeners as they cause layout jitters on some devices
+    /*
     useEffect(() => {
         const showSubscription = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
         const hideSubscription = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
@@ -139,6 +145,7 @@ export default function AddEntry({ route, navigation }: any) {
             hideSubscription.remove();
         };
     }, []);
+    */
 
     const statusOptions: PickerOption[] = [
         { label: 'Pending', value: 'Pending', color: '#9CA3AF' },
@@ -250,7 +257,17 @@ export default function AddEntry({ route, navigation }: any) {
     const renderSuggestions = (type: string) => {
         if (suggestions.type !== type || suggestions.data.length === 0) return null;
         return (
-            <View className="bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-b-xl overflow-hidden shadow-sm mb-4">
+            <View
+                style={{
+                    position: 'absolute', top: 76, left: 0, right: 0, zIndex: 1000,
+                    elevation: 8,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 10
+                }}
+                className="bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-xl overflow-hidden"
+            >
                 {suggestions.data.map((item, idx) => (
                     <TouchableOpacity
                         key={idx}
@@ -311,6 +328,9 @@ export default function AddEntry({ route, navigation }: any) {
                 pickupPersonId,
                 originalPrice: parseFloat(form.originalPrice) || 0,
                 sellingPrice: parseFloat(form.sellingPrice) || 0,
+                quantity: parseInt(form.quantity) || 1,
+                unitOriginalPrice: parseFloat(form.unitOriginalPrice) || 0,
+                unitSellingPrice: parseFloat(form.unitSellingPrice) || 0,
                 shippingCharges: parseFloat(form.shippingCharges) || 0,
                 pickupCharges: parseFloat(form.pickupCharges) || 0,
                 // Map the simplified UI choice back to DB fields
@@ -342,11 +362,11 @@ export default function AddEntry({ route, navigation }: any) {
                     <View className="w-10" />
                 </View>
 
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
                     <ScrollView
                         showsVerticalScrollIndicator={false}
-                        contentContainerStyle={[{ padding: 24, paddingBottom: isKeyboardVisible ? 300 : 80 }, desktopContainerStyle]}
-                        keyboardShouldPersistTaps="handled"
+                        contentContainerStyle={[{ padding: 24, paddingBottom: 150 }, desktopContainerStyle]}
+                        keyboardShouldPersistTaps="always"
                     >
                         {/* Status Selection */}
                         <Section title="Order Status" icon={Clock} isDark={isDark}>
@@ -413,33 +433,35 @@ export default function AddEntry({ route, navigation }: any) {
 
                         {/* Product & Parties */}
                         <Section title="Item & Parties" icon={Package} isDark={isDark}>
-                            <Input
-                                label="Product Name"
-                                placeholder="Enter product..."
-                                value={form.productName}
-                                onChangeText={text => handleSuggest(text, 'product')}
-                                leftIcon={<Package size={18} color="#9CA3AF" />}
-                                returnKeyType="next"
-                                onSubmitEditing={() => customerRef.current?.focus()}
-                                className={suggestions.type === 'product' ? 'mb-0 rounded-b-none' : ''}
-                            />
-                            {renderSuggestions('product')}
+                            <View style={{ zIndex: suggestions.type === 'product' ? 30 : 1 }}>
+                                <Input
+                                    label="Product Name"
+                                    placeholder="Enter product..."
+                                    value={form.productName}
+                                    onChangeText={text => handleSuggest(text, 'product')}
+                                    leftIcon={<Package size={18} color="#9CA3AF" />}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => customerRef.current?.focus()}
+                                />
+                                {renderSuggestions('product')}
+                            </View>
 
-                            <Input
-                                ref={customerRef}
-                                label="Customer Name"
-                                placeholder="Enter customer..."
-                                value={form.customerName}
-                                onChangeText={text => handleSuggest(text, 'customer')}
-                                leftIcon={<User size={18} color="#9CA3AF" />}
-                                returnKeyType="next"
-                                onSubmitEditing={() => vendorRef.current?.focus()}
-                                className={suggestions.type === 'customer' ? 'mb-0 rounded-b-none' : ''}
-                            />
-                            {renderSuggestions('customer')}
+                            <View style={{ zIndex: suggestions.type === 'customer' ? 20 : 1 }}>
+                                <Input
+                                    ref={customerRef}
+                                    label="Customer Name"
+                                    placeholder="Enter customer..."
+                                    value={form.customerName}
+                                    onChangeText={text => handleSuggest(text, 'customer')}
+                                    leftIcon={<User size={18} color="#9CA3AF" />}
+                                    returnKeyType="next"
+                                    onSubmitEditing={() => vendorRef.current?.focus()}
+                                />
+                                {renderSuggestions('customer')}
+                            </View>
 
                             <View className="flex-row gap-4">
-                                <View className="flex-1">
+                                <View className="flex-1" style={{ zIndex: suggestions.type === 'vendor' ? 10 : 1 }}>
                                     <Input
                                         ref={vendorRef}
                                         label="Vendor Name"
@@ -449,11 +471,10 @@ export default function AddEntry({ route, navigation }: any) {
                                         leftIcon={<ShoppingBag size={18} color="#9CA3AF" />}
                                         returnKeyType="next"
                                         onSubmitEditing={() => pickupRef.current?.focus()}
-                                        className={suggestions.type === 'vendor' ? 'mb-0 rounded-b-none' : ''}
                                     />
                                     {renderSuggestions('vendor')}
                                 </View>
-                                <View className="flex-1">
+                                <View className="flex-1" style={{ zIndex: suggestions.type === 'pickup' ? 10 : 1 }}>
                                     <Input
                                         ref={pickupRef}
                                         label="Pickup Person"
@@ -463,7 +484,6 @@ export default function AddEntry({ route, navigation }: any) {
                                         leftIcon={<Truck size={18} color="#9CA3AF" />}
                                         returnKeyType="next"
                                         onSubmitEditing={() => costPriceRef.current?.focus()}
-                                        className={suggestions.type === 'pickup' ? 'mb-0 rounded-b-none' : ''}
                                     />
                                     {renderSuggestions('pickup')}
                                 </View>
@@ -472,15 +492,78 @@ export default function AddEntry({ route, navigation }: any) {
 
                         {/* Financials */}
                         <Section title="Financials" icon={IndianRupee} isDark={isDark}>
+                            <View className="flex-row gap-4 mb-4">
+                                <View className="flex-[0.5]">
+                                    <Input
+                                        label="Qty"
+                                        placeholder="1"
+                                        keyboardType="numeric"
+                                        value={form.quantity}
+                                        onChangeText={text => {
+                                            const qty = parseInt(text) || 0;
+                                            const up = parseFloat(form.unitOriginalPrice) || 0;
+                                            const sp = parseFloat(form.unitSellingPrice) || 0;
+                                            setForm(prev => ({
+                                                ...prev,
+                                                quantity: text,
+                                                originalPrice: (qty * up).toString(),
+                                                sellingPrice: (qty * sp).toString()
+                                            }));
+                                        }}
+                                    />
+                                </View>
+                                <View className="flex-1">
+                                    <Input
+                                        label="Unit Cost"
+                                        placeholder="0"
+                                        keyboardType="numeric"
+                                        value={form.unitOriginalPrice}
+                                        onChangeText={text => {
+                                            const up = parseFloat(text) || 0;
+                                            const qty = parseInt(form.quantity) || 0;
+                                            setForm(prev => ({
+                                                ...prev,
+                                                unitOriginalPrice: text,
+                                                originalPrice: (qty * up).toString()
+                                            }));
+                                        }}
+                                    />
+                                </View>
+                                <View className="flex-1">
+                                    <Input
+                                        label="Unit Sales"
+                                        placeholder="0"
+                                        keyboardType="numeric"
+                                        value={form.unitSellingPrice}
+                                        onChangeText={text => {
+                                            const sp = parseFloat(text) || 0;
+                                            const qty = parseInt(form.quantity) || 0;
+                                            setForm(prev => ({
+                                                ...prev,
+                                                unitSellingPrice: text,
+                                                sellingPrice: (qty * sp).toString()
+                                            }));
+                                        }}
+                                    />
+                                </View>
+                            </View>
                             <View className="flex-row gap-4">
                                 <View className="flex-1">
                                     <Input
                                         ref={costPriceRef}
-                                        label="Cost Price"
+                                        label="Total Cost"
                                         placeholder="0"
                                         keyboardType="numeric"
                                         value={form.originalPrice}
-                                        onChangeText={text => setForm(prev => ({ ...prev, originalPrice: text }))}
+                                        onChangeText={text => {
+                                            const op = parseFloat(text) || 0;
+                                            const qty = parseInt(form.quantity) || 1;
+                                            setForm(prev => ({
+                                                ...prev,
+                                                originalPrice: text,
+                                                unitOriginalPrice: (op / qty).toFixed(2).toString()
+                                            }));
+                                        }}
                                         returnKeyType="next"
                                         onSubmitEditing={() => salePriceRef.current?.focus()}
                                     />
@@ -488,11 +571,19 @@ export default function AddEntry({ route, navigation }: any) {
                                 <View className="flex-1">
                                     <Input
                                         ref={salePriceRef}
-                                        label="Sales Price"
+                                        label="Total Sales"
                                         placeholder="0"
                                         keyboardType="numeric"
                                         value={form.sellingPrice}
-                                        onChangeText={text => setForm(prev => ({ ...prev, sellingPrice: text }))}
+                                        onChangeText={text => {
+                                            const sp = parseFloat(text) || 0;
+                                            const qty = parseInt(form.quantity) || 1;
+                                            setForm(prev => ({
+                                                ...prev,
+                                                sellingPrice: text,
+                                                unitSellingPrice: (sp / qty).toFixed(2).toString()
+                                            }));
+                                        }}
                                         returnKeyType="next"
                                         onSubmitEditing={() => pickupChRef.current?.focus()}
                                     />

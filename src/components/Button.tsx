@@ -16,6 +16,7 @@ export const Button = ({
     className,
     textClassName,
     loading,
+    style,
     ...props
 }: ButtonProps) => {
 
@@ -49,17 +50,24 @@ export const Button = ({
         danger: "text-white font-sans-bold text-base", // Added text-base
     };
 
+    // Destructure and ignore any shadow props that might bleed through from NativeWind
+    const {
+        shadowColor, shadowOffset, shadowOpacity, shadowRadius, elevation,
+        ...otherProps
+    } = props as any;
+
     return (
         <TouchableOpacity
             activeOpacity={0.7}
-            disabled={loading || props.disabled}
+            disabled={loading || otherProps.disabled}
             className={cn(
                 "rounded-2xl px-8 h-14 flex-row items-center justify-center border transition-all active:scale-95",
                 variantClasses[variant as keyof typeof variantClasses],
-                (loading || props.disabled) && "opacity-50",
+                (loading || otherProps.disabled) && "opacity-50",
                 className
             )}
-            {...props}
+            style={style}
+            {...otherProps}
         >
             {loading ? (
                 <View className="flex-row items-center">

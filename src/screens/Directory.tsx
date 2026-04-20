@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Clipboard, ToastAndroid, Platform, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, TextInput, Clipboard, ToastAndroid, Platform, Alert, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { supabaseService } from '../store/supabaseService';
-import { Search, UserPlus, Phone, MapPin, ChevronRight, X, User, Truck, Package, Copy, Plus, Trash2 } from 'lucide-react-native';
+import { Search, UserPlus, Phone, MapPin, ChevronRight, X, User, Truck, Package, Copy, Plus, Trash2, Archive } from 'lucide-react-native';
 import { useTransactions } from '../hooks/useTransactions';
 import { cn } from '../utils/cn';
 import { DirectoryItem } from '../utils/types';
@@ -66,6 +66,31 @@ export default function Directory() {
         } else {
             Alert.alert('Copied', 'Address copied to clipboard');
         }
+    };
+
+    const handleSoftDelete = async (id: string, name: string) => {
+        Alert.alert(
+            "Archive Item",
+            `Are you sure you want to archive "${name}"? It will no longer appear in suggests but will remain in your history.`,
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Archive",
+                    style: "destructive",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await supabaseService.softDeleteDirectoryItem(id);
+                            await loadData();
+                        } catch (err) {
+                            console.error('Delete error:', err);
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     const handleSave = async () => {
@@ -139,219 +164,234 @@ export default function Directory() {
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View style={[{ flex: 1, width: '100%' }, desktopContainerStyle]}>
                     <View className="px-6 pt-4 pb-2">
-                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Directory</Text>
+                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-2xl mb-4">Directory</Text>
 
-                    {/* Search & Add */}
-                    <View className="flex-row gap-3 mb-6">
-                        <View className="flex-1 flex-row items-center bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12">
-                            <Search size={18} color="#94a3b8" />
-                            <TextInput
-                                className="flex-1 ml-3 text-primary dark:text-primary-dark font-sans text-base"
-                                placeholder="Search..."
-                                placeholderTextColor="#94a3b8"
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                            />
+                        {/* Search & Add */}
+                        <View className="flex-row gap-3 mb-6">
+                            <View className="flex-1 flex-row items-center bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-2xl px-4 h-12">
+                                <Search size={18} color="#94a3b8" />
+                                <TextInput
+                                    className="flex-1 ml-3 text-primary dark:text-primary-dark font-sans text-base"
+                                    placeholder="Search..."
+                                    placeholderTextColor="#94a3b8"
+                                    value={searchQuery}
+                                    onChangeText={setSearchQuery}
+                                />
+                            </View>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setEditingItem(null);
+                                    setForm({ name: '', phone: '', addresses: [''] });
+                                    setModalVisible(true);
+                                }}
+                                className="bg-accent w-12 h-12 rounded-2xl items-center justify-center"
+                                style={{ elevation: 4, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 }}
+                            >
+                                <UserPlus size={22} color="white" />
+                            </TouchableOpacity>
                         </View>
-                        <TouchableOpacity
-                            onPress={() => {
-                                setEditingItem(null);
-                                setForm({ name: '', phone: '', addresses: [''] });
-                                setModalVisible(true);
-                            }}
-                            className="bg-accent w-12 h-12 rounded-2xl items-center justify-center shadow-lg shadow-accent/20"
+
+                        {/* Tabs */}
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            className="-mx-6 mb-6"
+                            contentContainerStyle={{ paddingHorizontal: 24 }}
                         >
-                            <UserPlus size={22} color="white" />
-                        </TouchableOpacity>
+                            <View className="flex-row gap-2">
+                                {tabs.map(tab => (
+                                    <TouchableOpacity
+                                        key={tab.id}
+                                        onPress={() => setActiveTab(tab.id)}
+                                        style={{
+                                            paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, borderWidth: 1,
+                                            backgroundColor: activeTab === tab.id ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
+                                            borderColor: activeTab === tab.id ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
+                                        }}
+                                    >
+                                        <View className="flex-row items-center">
+                                            <tab.icon size={14} color={activeTab === tab.id ? "white" : "#64748b"} />
+                                            <Text style={{
+                                                fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, marginLeft: 8,
+                                                color: activeTab === tab.id ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
+                                            }}>{tab.label}</Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </ScrollView>
                     </View>
 
-                    {/* Tabs */}
                     <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        className="-mx-6 mb-6"
-                        contentContainerStyle={{ paddingHorizontal: 24 }}
+                        className="flex-1 px-6"
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? '#818CF8' : '#4F46E5'} />}
                     >
-                        <View className="flex-row gap-2">
-                            {tabs.map(tab => (
-                                <TouchableOpacity
-                                    key={tab.id}
-                                    onPress={() => setActiveTab(tab.id)}
-                                    style={{
-                                        paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, borderWidth: 1,
-                                        backgroundColor: activeTab === tab.id ? '#4F46E5' : (isDark ? '#1E293B' : '#FFFFFF'),
-                                        borderColor: activeTab === tab.id ? '#4F46E5' : (isDark ? '#334155' : '#E2E8F0'),
-                                    }}
-                                >
-                                    <View className="flex-row items-center">
-                                        <tab.icon size={14} color={activeTab === tab.id ? "white" : "#64748b"} />
-                                        <Text style={{
-                                            fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, marginLeft: 8,
-                                            color: activeTab === tab.id ? '#FFFFFF' : (isDark ? '#94A3B8' : '#64748B'),
-                                        }}>{tab.label}</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    </ScrollView>
-                </View>
-
-                <ScrollView
-                    className="flex-1 px-6"
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={isDark ? '#818CF8' : '#4F46E5'} />}
-                >
-                    {loading && !refreshing ? (
-                        <View className="py-20 "><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} /></View>
-                    ) : (
-                        <View >
-                            {filteredItems.map((item, i) => {
-                                const addrs = getAddresses(item.address);
-                                return (
-                                    <Card
-                                        key={item.id}
-                                        className={cn("mb-3 p-4 border border-black/[0.08] dark:border-white/10")}
-                                    >
-                                        <TouchableOpacity
-                                            onPress={() => openEdit(item)}
-                                            activeOpacity={0.7}
+                        {loading && !refreshing ? (
+                            <View className="py-20 "><ActivityIndicator color={isDark ? '#818CF8' : '#4F46E5'} /></View>
+                        ) : (
+                            <View >
+                                {filteredItems.map((item, i) => {
+                                    const addrs = getAddresses(item.address);
+                                    return (
+                                        <Card
+                                            key={item.id}
+                                            className={cn("mb-3 p-4 border border-black/[0.08] dark:border-white/10")}
                                         >
-                                            <View className="flex-row items-center justify-between mb-3">
-                                                <View className="flex-row items-center flex-1">
-                                                    <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
-                                                        <User size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                                    </View>
-                                                    <View className="flex-1">
-                                                        <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base" numberOfLines={1}>{item.name}</Text>
-                                                        {item.phone && (
-                                                            <View className="flex-row items-center mt-0.5">
-                                                                <Phone size={10} color="#64748b" />
-                                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-[11px] ml-1">{item.phone}</Text>
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                </View>
-                                                <ChevronRight size={18} color="#94a3b8" />
-                                            </View>
-                                        </TouchableOpacity>
-
-                                        {addrs.length > 0 && (
-                                            <View className="mt-1">
-                                                <View className="bg-surface dark:bg-background-dark/50 rounded-xl p-3 flex-row items-start border border-divider/50 dark:border-divider-dark/50">
-                                                    <MapPin size={14} color="#64748b" style={{ marginTop: 2, marginRight: 8 }} />
-                                                    <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans text-xs leading-4" numberOfLines={2}>
-                                                        {addrs[0]}
-                                                    </Text>
-                                                    <TouchableOpacity
-                                                        onPress={() => handleCopy(addrs[0])}
-                                                        className="p-1.5 ml-2 rounded-lg bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark"
-                                                    >
-                                                        <Copy size={12} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                                    </TouchableOpacity>
-                                                </View>
-                                                {addrs.length > 1 && (
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] ml-2 mt-1">
-                                                        + {addrs.length - 1} more addresses
-                                                    </Text>
-                                                )}
-                                            </View>
-                                        )}
-                                    </Card>
-                                );
-                            })}
-                            {filteredItems.length === 0 && (
-                                <View className="py-20 items-center">
-                                    <Text className="text-secondary font-sans italic">No items found</Text>
-                                </View>
-                            )}
-                        </View>
-                    )}
-                </ScrollView>
-
-                {/* Edit/Add Modal */}
-                <Modal visible={modalVisible} transparent animationType={isWeb ? 'fade' : 'slide'}>
-                    <View style={isWeb
-                        ? { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 }
-                        : {}
-                    } className={isWeb ? '' : 'flex-1 justify-end bg-black/50'}>
-                        <Card style={isWeb ? { width: '100%', maxWidth: 480, borderRadius: 24, padding: 24 } : {}} className={isWeb ? '' : 'rounded-t-3xl p-6 pb-10'}>
-                            <View className="flex-row justify-between items-center mb-6">
-                                <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">
-                                    {editingItem ? 'Edit' : 'Add'} {activeTab}
-                                </Text>
-                                <TouchableOpacity onPress={() => setModalVisible(false)} className="p-2 bg-surface dark:bg-surface-dark rounded-full">
-                                    <X size={20} color="#9CA3AF" />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView className="max-h-[70%]" showsVerticalScrollIndicator={false}>
-                                <View className="gap-2">
-                                    <Input label="Name" value={form.name} onChangeText={t => setForm(p => ({ ...p, name: t }))} />
-                                    {activeTab !== 'Product' && (
-                                        <>
-                                            <Input label="Phone" value={form.phone} onChangeText={t => setForm(p => ({ ...p, phone: t }))} keyboardType="phone-pad" />
-
-                                            <View className="mb-4">
-                                                <View className="flex-row justify-between items-center mb-3">
-                                                    <Text className="text-secondary dark:text-secondary-dark font-sans-medium text-sm ml-1">Addresses</Text>
-                                                    <TouchableOpacity
-                                                        onPress={addAddressField}
-                                                        className="flex-row items-center bg-accent dark:bg-accent-dark px-4 py-2 rounded-xl shadow-sm"
-                                                    >
-                                                        <Plus size={14} color="white" />
-                                                        <Text className="text-white font-sans-bold text-xs ml-1">Add Address</Text>
-                                                    </TouchableOpacity>
-                                                </View>
-
-                                                {form.addresses.map((addr, idx) => (
-                                                    <View key={idx} className="mb-5">
-                                                        <View className="flex-row items-start gap-2">
-                                                            <View className="flex-1">
-                                                                <Input
-                                                                    className="mb-0"
-                                                                    placeholder={`Address ${idx + 1}`}
-                                                                    value={addr}
-                                                                    onChangeText={t => updateAddress(t, idx)}
-                                                                    multiline
-                                                                    numberOfLines={5}
-                                                                    style={{ minHeight: 120, textAlignVertical: 'top' }}
-                                                                />
-                                                            </View>
-                                                            <View className="gap-2">
-                                                                {addr.trim() !== '' && (
-                                                                    <TouchableOpacity
-                                                                        onPress={() => handleCopy(addr)}
-                                                                        className="p-3 bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-xl"
-                                                                    >
-                                                                        <Copy size={18} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                                                    </TouchableOpacity>
-                                                                )}
-                                                                {form.addresses.length > 1 && (
-                                                                    <TouchableOpacity
-                                                                        onPress={() => removeAddressField(idx)}
-                                                                        className="p-3 bg-danger/10 rounded-xl"
-                                                                    >
-                                                                        <Trash2 size={18} color="#EF4444" />
-                                                                    </TouchableOpacity>
-                                                                )}
-                                                            </View>
+                                            <TouchableOpacity
+                                                onPress={() => openEdit(item)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View className="flex-row items-center justify-between mb-3">
+                                                    <View className="flex-row items-center flex-1">
+                                                        <View className="w-10 h-10 bg-accent/10 rounded-xl items-center justify-center mr-4">
+                                                            <User size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                        </View>
+                                                        <View className="flex-1">
+                                                            <Text className="text-primary dark:text-primary-dark font-sans-semibold text-base" numberOfLines={1}>{item.name}</Text>
+                                                            {item.phone && (
+                                                                <View className="flex-row items-center mt-0.5">
+                                                                    <Phone size={10} color="#64748b" />
+                                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-[11px] ml-1">{item.phone}</Text>
+                                                                </View>
+                                                            )}
                                                         </View>
                                                     </View>
-                                                ))}
-                                            </View>
-                                        </>
-                                    )}
-                                </View>
-                            </ScrollView>
+                                                    <View className="flex-row items-center gap-2">
+                                                        <TouchableOpacity
+                                                            onPress={() => handleSoftDelete(item.id, item.name)}
+                                                            className="p-2 bg-danger/10 rounded-lg"
+                                                        >
+                                                            <Trash2 size={16} color="#EF4444" />
+                                                        </TouchableOpacity>
+                                                        <ChevronRight size={18} color="#94a3b8" />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
 
-                            <View className="pt-4 border-t border-divider dark:border-divider-dark">
-                                <Button onPress={handleSave} className="h-14 shadow-lg shadow-accent/20" disabled={!form.name || loading}>
-                                    <Text className="text-white font-sans-bold text-lg">{loading ? 'Saving...' : 'Save Changes'}</Text>
-                                </Button>
+                                            {addrs.length > 0 && (
+                                                <View className="mt-1">
+                                                    <View className="bg-surface dark:bg-background-dark/50 rounded-xl p-3 flex-row items-start border border-divider/50 dark:border-divider-dark/50">
+                                                        <MapPin size={14} color="#64748b" style={{ marginTop: 2, marginRight: 8 }} />
+                                                        <Text className="flex-1 text-secondary dark:text-secondary-dark font-sans text-xs leading-4" numberOfLines={2}>
+                                                            {addrs[0]}
+                                                        </Text>
+                                                        <TouchableOpacity
+                                                            onPress={() => handleCopy(addrs[0])}
+                                                            className="p-1.5 ml-2 rounded-lg bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark"
+                                                        >
+                                                            <Copy size={12} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                    {addrs.length > 1 && (
+                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px] ml-2 mt-1">
+                                                            + {addrs.length - 1} more addresses
+                                                        </Text>
+                                                    )}
+                                                </View>
+                                            )}
+                                        </Card>
+                                    );
+                                })}
+                                {filteredItems.length === 0 && (
+                                    <View className="py-20 items-center">
+                                        <Text className="text-secondary font-sans italic">No items found</Text>
+                                    </View>
+                                )}
                             </View>
-                        </Card>
+                        )}
+                    </ScrollView>
 
-                    </View>
-                </Modal>
+                    {/* Edit/Add Modal */}
+                    <Modal visible={modalVisible} transparent animationType={isWeb ? 'fade' : 'slide'}>
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={{ flex: 1 }}
+                            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                        >
+                            <View style={isWeb
+                                ? { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 24 }
+                                : {}
+                            } className={isWeb ? '' : 'flex-1 justify-end bg-black/50'}>
+                                <Card style={isWeb ? { width: '100%', maxWidth: 480, borderRadius: 24, padding: 24 } : {}} className={isWeb ? '' : 'rounded-t-3xl p-6 pb-10'}>
+                                    <View className="flex-row justify-between items-center mb-6">
+                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">
+                                            {editingItem ? 'Edit' : 'Add'} {activeTab}
+                                        </Text>
+                                        <TouchableOpacity onPress={() => setModalVisible(false)} className="p-2 bg-surface dark:bg-surface-dark rounded-full">
+                                            <X size={20} color="#9CA3AF" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <ScrollView className="max-h-[70%]" showsVerticalScrollIndicator={false}>
+                                        <View className="gap-2">
+                                            <Input label="Name" value={form.name} onChangeText={t => setForm(p => ({ ...p, name: t }))} />
+                                            {activeTab !== 'Product' && (
+                                                <>
+                                                    <Input label="Phone" value={form.phone} onChangeText={t => setForm(p => ({ ...p, phone: t }))} keyboardType="phone-pad" />
+
+                                                    <View className="mb-4">
+                                                        <View className="flex-row justify-between items-center mb-3">
+                                                            <Text className="text-secondary dark:text-secondary-dark font-sans-medium text-sm ml-1">Addresses</Text>
+                                                            <TouchableOpacity
+                                                                onPress={addAddressField}
+                                                                className="flex-row items-center bg-accent dark:bg-accent-dark px-4 py-2 rounded-xl"
+                                                                style={{ elevation: 2, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}
+                                                            >
+                                                                <Plus size={14} color="white" />
+                                                                <Text className="text-white font-sans-bold text-xs ml-1">Add Address</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
+
+                                                        {form.addresses.map((addr, idx) => (
+                                                            <View key={idx} className="mb-5">
+                                                                <View className="flex-row items-start gap-2">
+                                                                    <View className="flex-1">
+                                                                        <Input
+                                                                            className="mb-0"
+                                                                            placeholder={`Address ${idx + 1}`}
+                                                                            value={addr}
+                                                                            onChangeText={t => updateAddress(t, idx)}
+                                                                            multiline
+                                                                            numberOfLines={5}
+                                                                            style={{ minHeight: 120, textAlignVertical: 'top' }}
+                                                                        />
+                                                                    </View>
+                                                                    <View className="gap-2">
+                                                                        {addr.trim() !== '' && (
+                                                                            <TouchableOpacity
+                                                                                onPress={() => handleCopy(addr)}
+                                                                                className="p-3 bg-surface dark:bg-surface-dark border border-divider dark:border-divider-dark rounded-xl"
+                                                                            >
+                                                                                <Copy size={18} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                                            </TouchableOpacity>
+                                                                        )}
+                                                                        {form.addresses.length > 1 && (
+                                                                            <TouchableOpacity
+                                                                                onPress={() => removeAddressField(idx)}
+                                                                                className="p-3 bg-danger/10 rounded-xl"
+                                                                            >
+                                                                                <Trash2 size={18} color="#EF4444" />
+                                                                            </TouchableOpacity>
+                                                                        )}
+                                                                    </View>
+                                                                </View>
+                                                            </View>
+                                                        ))}
+                                                    </View>
+                                                </>
+                                            )}
+                                        </View>
+                                    </ScrollView>
+
+                                    <View className="pt-4 border-t border-divider dark:border-divider-dark">
+                                        <Button onPress={handleSave} className="h-14" style={{ elevation: 4, shadowColor: '#4F46E5', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8 }} disabled={!form.name || loading}>
+                                            <Text className="text-white font-sans-bold text-lg">{loading ? 'Saving...' : 'Save Changes'}</Text>
+                                        </Button>
+                                    </View>
+                                </Card>
+                            </View>
+                        </KeyboardAvoidingView>
+                    </Modal>
                 </View>
             </SafeAreaView>
         </Background>
