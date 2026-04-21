@@ -321,101 +321,85 @@ export default function Transactions({ navigation }: { navigation: any }) {
                                         </TouchableOpacity>
                                     )}
                                 </View>
-                                <Card className="px-4 py-0">
+                                <View>
                                     {group.data.map((item: any, i: number) => (
-                                        <TouchableOpacity
-                                            key={item.id}
-                                            onPress={() => {
-                                                if (selectionMode) toggleSelection(item.id);
-                                                else navigation.navigate('OrderDetail', { order: item });
-                                            }}
-                                            onLongPress={() => handleLongPress(item.id)}
-                                            delayLongPress={300}
-                                            activeOpacity={0.6}
-                                            className={cn(
-                                                "py-3 flex-row items-center",
-                                                i > 0 && "border-t border-divider dark:border-divider-dark",
-                                                selectionMode && selectedIds.has(item.id) && (isDark ? 'bg-accent/10' : 'bg-accent/5')
-                                            )}
-                                        >
-                                            {/* Selection Checkbox */}
-                                            {selectionMode && (
-                                                <View className="mr-3">
-                                                    {selectedIds.has(item.id) ? (
-                                                        <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
-                                                            <Check color="white" size={12} strokeWidth={3} />
-                                                        </View>
-                                                    ) : (
-                                                        <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
+                                        <Card key={item.id} className={cn("p-4 mb-3 border border-divider dark:border-divider-dark", selectionMode && selectedIds.has(item.id) && (isDark ? 'bg-accent/10' : 'bg-accent/5'))} style={{ padding: 16 }}>
+                                            <TouchableOpacity
+                                                onPress={() => {
+                                                    if (selectionMode) toggleSelection(item.id);
+                                                    else navigation.navigate('OrderDetail', { order: item });
+                                                }}
+                                                onLongPress={() => handleLongPress(item.id)}
+                                                delayLongPress={300}
+                                                activeOpacity={0.6}
+                                                className="flex-col"
+                                            >
+                                                {/* Header Row */}
+                                                <View className="flex-row justify-between items-start mb-2 pt-1 border-0">
+                                                    <View className="flex-row items-center flex-1 mr-2">
+                                                        {selectionMode && (
+                                                            <View className="mr-3">
+                                                                {selectedIds.has(item.id) ? (
+                                                                    <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
+                                                                        <Check color="white" size={12} strokeWidth={3} />
+                                                                    </View>
+                                                                ) : (
+                                                                    <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
+                                                                )}
+                                                            </View>
+                                                        )}
+                                                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-base" numberOfLines={1}>
+                                                            {item.productName} {item.quantity > 1 ? `(x${item.quantity})` : ''}
+                                                        </Text>
+                                                    </View>
+                                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-lg">₹{(Number(item.sellingPrice) + Number(item.shippingCharges || 0) + Number(item.pickupCharges || 0)).toLocaleString()}</Text>
+                                                </View>
+
+                                                {/* Meta Info Row */}
+                                                <View className="flex-row items-center mb-4">
+                                                    <View className={cn("w-2 h-2 rounded-full mr-2", item.customerPaymentStatus === 'Paid' ? 'bg-success' : 'bg-warning')} />
+                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.customerName}</Text>
+                                                    <ChevronRight size={12} color="#9CA3AF" style={{ marginHorizontal: 4 }} />
+                                                    <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.vendorName}</Text>
+                                                </View>
+
+                                                {/* Action Row */}
+                                                <View className="flex-row justify-between items-center pt-3 border-t border-divider/50 dark:border-divider-dark/50">
+                                                    <TouchableOpacity
+                                                        onPress={(e) => {
+                                                            if (selectionMode) { e.stopPropagation(); toggleSelection(item.id); return; }
+                                                            e.stopPropagation(); setSelectedOrder(item); setPickerVisible(true);
+                                                        }}
+                                                        disabled={updatingId === item.id}
+                                                        className={cn("flex-row items-center px-3 py-1.5 rounded-lg", getStatusStyle(item.status).bg)}
+                                                    >
+                                                        {updatingId === item.id ? (
+                                                            <ActivityIndicator size={12} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                        ) : (
+                                                            <>
+                                                                <Text className={cn("font-sans-bold text-[10px] uppercase", getStatusStyle(item.status).text)}>{item.status || 'Pending'}</Text>
+                                                                <ChevronDown size={12} color={getStatusStyle(item.status).color} style={{ marginLeft: 4 }} />
+                                                            </>
+                                                        )}
+                                                    </TouchableOpacity>
+
+                                                    {STATUS_FLOW[item.status] && !selectionMode && (
+                                                        <TouchableOpacity
+                                                            onPress={(e) => { e.stopPropagation(); handleQuickAdvance(item); }}
+                                                            disabled={updatingId === item.id}
+                                                            className="flex-row items-center mr-1 bg-accent/10 px-3 py-1.5 rounded-lg"
+                                                        >
+                                                            <Text className="text-accent dark:text-accent-dark font-sans-bold text-[11px] uppercase tracking-wider mr-1">
+                                                                {getNextLabel(item.status)}
+                                                            </Text>
+                                                            <ChevronRight size={14} color={isDark ? '#818CF8' : '#4F46E5'} />
+                                                        </TouchableOpacity>
                                                     )}
                                                 </View>
-                                            )}
-                                            <View className="flex-row items-center flex-1">
-                                                <View className="flex-1">
-                                                    <Text className="text-primary dark:text-primary-dark font-sans-semibold text-sm" numberOfLines={1}>
-                                                        {item.productName} {item.quantity > 1 ? `(x${item.quantity})` : ''}
-                                                    </Text>
-                                                    <View className="flex-row items-center mt-1 gap-2">
-                                                        <View className={cn("w-2 h-2 rounded-full",
-                                                            item.customerPaymentStatus === 'Paid' ? 'bg-success' : 'bg-warning'
-                                                        )} />
-                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.customerName}</Text>
-                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">→</Text>
-                                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">{item.vendorName}</Text>
-                                                    </View>
-                                                </View>
-                                                <View className="items-end ml-3">
-                                                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-sm">₹{(Number(item.sellingPrice) + Number(item.shippingCharges || 0) + Number(item.pickupCharges || 0)).toLocaleString()}</Text>
-                                                    <View className="flex-row items-center gap-2 mt-2">
-                                                        {/* Quick advance button */}
-                                                        {STATUS_FLOW[item.status] && !selectionMode && (
-                                                            <TouchableOpacity
-                                                                onPress={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleQuickAdvance(item);
-                                                                }}
-                                                                disabled={updatingId === item.id}
-                                                                className="px-3 py-1 rounded-lg bg-accent/20 border border-accent/30"
-                                                                activeOpacity={0.6}
-                                                            >
-                                                                <Text className="text-accent dark:text-accent-dark font-sans-bold text-[11px] uppercase tracking-tighter">
-                                                                    {getNextLabel(item.status)}
-                                                                </Text>
-                                                            </TouchableOpacity>
-                                                        )}
-                                                        {/* Status badge with dropdown */}
-                                                        <TouchableOpacity
-                                                            onPress={(e) => {
-                                                                if (selectionMode) {
-                                                                    e.stopPropagation();
-                                                                    toggleSelection(item.id);
-                                                                    return;
-                                                                }
-                                                                e.stopPropagation();
-                                                                setSelectedOrder(item);
-                                                                setPickerVisible(true);
-                                                            }}
-                                                            disabled={updatingId === item.id}
-                                                            className={cn("flex-row items-center px-2 py-1 rounded-lg", getStatusStyle(item.status).bg)}
-                                                            activeOpacity={0.7}
-                                                        >
-                                                            {updatingId === item.id ? (
-                                                                <ActivityIndicator size={10} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                                            ) : (
-                                                                <>
-                                                                    <Text className={cn("font-sans-bold text-[10px] uppercase", getStatusStyle(item.status).text)}>
-                                                                        {item.status || 'Pending'}
-                                                                    </Text>
-                                                                    <ChevronDown size={10} color={getStatusStyle(item.status).color} style={{ marginLeft: 3 }} />
-                                                                </>
-                                                            )}
-                                                        </TouchableOpacity>
-                                                    </View>
-                                                </View>
-                                            </View>
-                                        </TouchableOpacity>
+                                            </TouchableOpacity>
+                                        </Card>
                                     ))}
-                                </Card>
+                                </View>
                             </View>
                         )}
                         ListEmptyComponent={

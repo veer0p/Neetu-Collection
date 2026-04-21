@@ -159,11 +159,9 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
 
     const loadLedger = async () => {
         setLoading(true);
-        const data = await supabaseService.getLedgerEntries(person.id);
+        const data = await supabaseService.getV2LedgerByPerson(person.id);
 
         // Net Balance: Sum of all entries to maintain a correct running balance.
-        // We no longer filter by !isSettled because manual payments might partially settle orders
-        // and we need the full historical sum for an accurate net position.
         const total = data.reduce((acc: number, curr: any) => acc + curr.amount, 0);
         setFullBalance(total);
 
@@ -544,152 +542,149 @@ export default function AccountDetail({ navigation, route }: { navigation: any, 
                                 const isSelected = selectedIds.has(selectionId);
 
                                 return (
-                                    <TouchableOpacity
-                                        onPress={() => handleEntryPress(item)}
-                                        onLongPress={() => handleLongPress(item)}
-                                        activeOpacity={0.6}
-                                        style={{
-                                            flexDirection: 'row', alignItems: 'center',
-                                            paddingVertical: 14,
-                                            borderTopWidth: index > 0 ? 1 : 0,
-                                            borderTopColor: isDark ? '#1E293B' : '#F1F5F9',
-                                            backgroundColor: selectionMode && isSelected ? (isDark ? 'rgba(129,140,248,0.1)' : 'rgba(79,70,229,0.05)') : 'transparent',
-                                            paddingHorizontal: selectionMode ? 12 : 0,
-                                            marginHorizontal: selectionMode ? -12 : 0,
-                                            borderRadius: 12,
-                                        }}
-                                    >
-                                        {/* Selection Checkbox */}
-                                        {
-                                            selectionMode && (
-                                                <View className="mr-3">
-                                                    {selectedIds.has(selectionId) ? (
-                                                        <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
-                                                            <Check color="white" size={12} strokeWidth={3} />
-                                                        </View>
-                                                    ) : (
-                                                        <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
-                                                    )}
-                                                </View>
-                                            )
-                                        }
-
-                                        {/* Left icon */}
-                                        <View style={{
-                                            width: 38, height: 38, borderRadius: 10,
-                                            backgroundColor: isInflow ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
-                                            alignItems: 'center', justifyContent: 'center', marginRight: 12,
-                                        }}>
-                                            {isInflow
-                                                ? <TrendingUp size={18} color="#10B981" />
-                                                : <TrendingDown size={18} color="#EF4444" />
+                                    <Card className={cn("mb-3 border border-black/5 dark:border-white/5", selectionMode && isSelected ? (isDark ? 'bg-accent/20' : 'bg-accent/10') : '')} style={{ padding: 0 }}>
+                                        <TouchableOpacity
+                                            onPress={() => handleEntryPress(item)}
+                                            onLongPress={() => handleLongPress(item)}
+                                            activeOpacity={0.6}
+                                            style={{
+                                                flexDirection: 'row', alignItems: 'center',
+                                                paddingVertical: 16,
+                                                paddingHorizontal: 16
+                                            }}
+                                        >
+                                            {/* Selection Checkbox */}
+                                            {
+                                                selectionMode && (
+                                                    <View className="mr-3">
+                                                        {selectedIds.has(selectionId) ? (
+                                                            <View className="w-5 h-5 rounded-full bg-accent items-center justify-center">
+                                                                <Check color="white" size={12} strokeWidth={3} />
+                                                            </View>
+                                                        ) : (
+                                                            <View className="w-5 h-5 rounded-full border-2 border-secondary/30" />
+                                                        )}
+                                                    </View>
+                                                )
                                             }
-                                        </View>
 
-                                        {/* Center: type + sub-line (product/notes + date + status) */}
-                                        <View style={{ flex: 1 }}>
-                                            {/* Line 1: transaction type */}
-                                            <Text style={{
-                                                fontFamily: 'PlusJakartaSans_600SemiBold',
-                                                fontSize: 13,
-                                                color: isDark ? '#F1F5F9' : '#0F172A',
-                                            }} numberOfLines={1}>
-                                                {item.transactionType}
-                                                {item.orderId && item.orderProductName ? (
-                                                    <Text style={{
-                                                        fontFamily: 'PlusJakartaSans_400Regular',
-                                                        fontSize: 12,
-                                                        color: isDark ? '#818CF8' : '#4F46E5',
-                                                    }}> · {item.orderProductName}{item.orderQuantity ? ` (x${item.orderQuantity})` : ''}</Text>
-                                                ) : null}
-                                            </Text>
+                                            {/* Left icon */}
+                                            <View style={{
+                                                width: 38, height: 38, borderRadius: 10,
+                                                backgroundColor: isInflow ? 'rgba(16,185,129,0.10)' : 'rgba(239,68,68,0.10)',
+                                                alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                                            }}>
+                                                {isInflow
+                                                    ? <TrendingUp size={18} color="#10B981" />
+                                                    : <TrendingDown size={18} color="#EF4444" />
+                                                }
+                                            </View>
 
-                                            {/* Line 2: date + time + status pill or action button (all inline) */}
-                                            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
+                                            {/* Center: type + sub-line (product/notes + date + status) */}
+                                            <View style={{ flex: 1 }}>
+                                                {/* Line 1: transaction type */}
                                                 <Text style={{
-                                                    fontFamily: 'PlusJakartaSans_400Regular',
-                                                    fontSize: 11,
-                                                    color: isDark ? '#64748B' : '#94A3B8',
-                                                }}>
-                                                    {new Date(displayTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                                    {' '}
-                                                    <Text style={{ fontSize: 10 }}>
-                                                        {new Date(displayTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                                    </Text>
+                                                    fontFamily: 'PlusJakartaSans_600SemiBold',
+                                                    fontSize: 13,
+                                                    color: isDark ? '#F1F5F9' : '#0F172A',
+                                                }} numberOfLines={1}>
+                                                    {item.transactionType}
+                                                    {item.orderId && item.orderProductName ? (
+                                                        <Text style={{
+                                                            fontFamily: 'PlusJakartaSans_400Regular',
+                                                            fontSize: 12,
+                                                            color: isDark ? '#818CF8' : '#4F46E5',
+                                                        }}> · {item.orderProductName}{item.orderQuantity ? ` (x${item.orderQuantity})` : ''}</Text>
+                                                    ) : null}
                                                 </Text>
 
-                                                {item.notes && !item.orderId ? (
+                                                {/* Line 2: date + time + status pill or action button (all inline) */}
+                                                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3, gap: 6 }}>
                                                     <Text style={{
-                                                        fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11,
+                                                        fontFamily: 'PlusJakartaSans_400Regular',
+                                                        fontSize: 11,
                                                         color: isDark ? '#64748B' : '#94A3B8',
-                                                    }} numberOfLines={1}>· {item.notes}</Text>
-                                                ) : null}
-
-                                                {/* Status or action — inline */}
-                                                {isActionable && isCanceled && (
-                                                    <View style={{
-                                                        paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-                                                        backgroundColor: 'rgba(239,68,68,0.10)',
                                                     }}>
-                                                        <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#EF4444', letterSpacing: 0.4 }}>
-                                                            CANCELED
+                                                        {new Date(displayTime).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                                        {' '}
+                                                        <Text style={{ fontSize: 10 }}>
+                                                            {new Date(displayTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                                                         </Text>
-                                                    </View>
-                                                )}
+                                                    </Text>
 
-                                                {isActionable && !isCanceled && alreadySettled && (
-                                                    <View style={{
-                                                        flexDirection: 'row', alignItems: 'center', gap: 3,
-                                                        paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
-                                                        backgroundColor: 'rgba(16,185,129,0.10)',
-                                                    }}>
-                                                        <View style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: '#10B981' }} />
-                                                        <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#10B981', letterSpacing: 0.4 }}>
-                                                            SETTLED
-                                                        </Text>
-                                                    </View>
-                                                )}
-
-                                                {isActionable && !isCanceled && !alreadySettled && (
-                                                    <TouchableOpacity
-                                                        onPress={(e) => { e.stopPropagation(); handleQuickSettle(item); }}
-                                                        activeOpacity={0.75}
-                                                        style={{
-                                                            flexDirection: 'row', alignItems: 'center', gap: 4,
-                                                            paddingHorizontal: 8, paddingVertical: 3,
-                                                            borderRadius: 6, borderWidth: 1,
-                                                            borderColor: isInflow ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)',
-                                                            backgroundColor: isInflow ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
-                                                        }}
-                                                    >
+                                                    {item.notes && !item.orderId ? (
                                                         <Text style={{
-                                                            fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, letterSpacing: 0.2,
-                                                            color: isInflow ? '#10B981' : '#F59E0B',
-                                                        }}>
-                                                            {isInflow ? 'Mark Received' : 'Mark Paid'}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
-                                        </View>
+                                                            fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11,
+                                                            color: isDark ? '#64748B' : '#94A3B8',
+                                                        }} numberOfLines={1}>· {item.notes}</Text>
+                                                    ) : null}
 
-                                        {/* Right: amount */}
-                                        <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                                            <Text style={{
-                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15,
-                                                color: isInflow ? '#10B981' : '#EF4444',
-                                            }}>
-                                                {isInflow ? '+' : '-'}₹{Math.abs(item.amount).toLocaleString()}
-                                            </Text>
-                                            <View style={{ marginTop: 4 }}>
-                                                {item.orderId ? (
-                                                    <Lock size={11} color={isDark ? '#475569' : '#CBD5E1'} style={{ opacity: 0.4 }} />
-                                                ) : (
-                                                    <View style={{ width: 11, height: 11 }} />
-                                                )}
+                                                    {/* Status or action — inline */}
+                                                    {isActionable && isCanceled && (
+                                                        <View style={{
+                                                            paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                                                            backgroundColor: 'rgba(239,68,68,0.10)',
+                                                        }}>
+                                                            <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#EF4444', letterSpacing: 0.4 }}>
+                                                                CANCELED
+                                                            </Text>
+                                                        </View>
+                                                    )}
+
+                                                    {isActionable && !isCanceled && alreadySettled && (
+                                                        <View style={{
+                                                            flexDirection: 'row', alignItems: 'center', gap: 3,
+                                                            paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+                                                            backgroundColor: 'rgba(16,185,129,0.10)',
+                                                        }}>
+                                                            <View style={{ width: 4, height: 4, borderRadius: 99, backgroundColor: '#10B981' }} />
+                                                            <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, color: '#10B981', letterSpacing: 0.4 }}>
+                                                                SETTLED
+                                                            </Text>
+                                                        </View>
+                                                    )}
+
+                                                    {isActionable && !isCanceled && !alreadySettled && (
+                                                        <TouchableOpacity
+                                                            onPress={(e) => { e.stopPropagation(); handleQuickSettle(item); }}
+                                                            activeOpacity={0.75}
+                                                            style={{
+                                                                flexDirection: 'row', alignItems: 'center', gap: 4,
+                                                                paddingHorizontal: 8, paddingVertical: 3,
+                                                                borderRadius: 6, borderWidth: 1,
+                                                                borderColor: isInflow ? 'rgba(16,185,129,0.35)' : 'rgba(245,158,11,0.35)',
+                                                                backgroundColor: isInflow ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+                                                            }}
+                                                        >
+                                                            <Text style={{
+                                                                fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, letterSpacing: 0.2,
+                                                                color: isInflow ? '#10B981' : '#F59E0B',
+                                                            }}>
+                                                                {isInflow ? 'Mark Received' : 'Mark Paid'}
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </View>
                                             </View>
-                                        </View>
-                                    </TouchableOpacity>
+
+                                            {/* Right: amount */}
+                                            <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                                                <Text style={{
+                                                    fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15,
+                                                    color: isInflow ? '#10B981' : '#EF4444',
+                                                }}>
+                                                    {isInflow ? '+' : '-'}₹{Math.abs(item.amount).toLocaleString()}
+                                                </Text>
+                                                <View style={{ marginTop: 4 }}>
+                                                    {item.orderId ? (
+                                                        <Lock size={11} color={isDark ? '#475569' : '#CBD5E1'} style={{ opacity: 0.4 }} />
+                                                    ) : (
+                                                        <View style={{ width: 11, height: 11 }} />
+                                                    )}
+                                                </View>
+                                            </View>
+                                        </TouchableOpacity>
+                                    </Card>
                                 );
                             }}
 

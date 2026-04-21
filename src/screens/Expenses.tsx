@@ -7,6 +7,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Background } from '../components/Background';
 import { Card } from '../components/Card';
+import { Input } from '../components/Input';
+import { Button } from '../components/Button';
 import { supabaseService } from '../store/supabaseService';
 import { useTransactions } from '../hooks/useTransactions';
 import {
@@ -321,41 +323,27 @@ export default function Expenses({ navigation }: { navigation: any }) {
                                     </TouchableOpacity>
                                 </View>
 
-                                {/* Title */}
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2 uppercase tracking-wider">
-                                    Title *
-                                </Text>
-                                <TextInput
+                                {/* Form Fields */}
+                                <Input
+                                    label="Title *"
                                     placeholder="e.g. Packaging supplies"
-                                    placeholderTextColor="#9CA3AF"
                                     value={title}
                                     onChangeText={setTitle}
-                                    className="bg-surface dark:bg-[#0F172A] border border-divider dark:border-divider-dark rounded-2xl px-4 h-12 text-primary dark:text-primary-dark font-sans text-sm mb-4"
                                 />
 
-                                {/* Amount */}
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2 uppercase tracking-wider">
-                                    Amount (₹) *
-                                </Text>
-                                <TextInput
+                                <Input
+                                    label="Amount (₹) *"
                                     placeholder="0"
-                                    placeholderTextColor="#9CA3AF"
                                     value={amount}
                                     onChangeText={setAmount}
                                     keyboardType="numeric"
-                                    className="bg-surface dark:bg-[#0F172A] border border-divider dark:border-divider-dark rounded-2xl px-4 h-12 text-primary dark:text-primary-dark font-sans text-sm mb-4"
                                 />
 
-                                {/* Date */}
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2 uppercase tracking-wider">
-                                    Date
-                                </Text>
-                                <TextInput
+                                <Input
+                                    label="Date"
                                     placeholder="DD/MM/YYYY"
-                                    placeholderTextColor="#9CA3AF"
                                     value={date}
                                     onChangeText={setDate}
-                                    className="bg-surface dark:bg-[#0F172A] border border-divider dark:border-divider-dark rounded-2xl px-4 h-12 text-primary dark:text-primary-dark font-sans text-sm mb-4"
                                 />
 
                                 {/* Category */}
@@ -386,42 +374,24 @@ export default function Expenses({ navigation }: { navigation: any }) {
                                 </View>
 
                                 {/* Notes */}
-                                <Text className="text-secondary dark:text-secondary-dark font-sans-semibold text-xs mb-2 uppercase tracking-wider">
-                                    Notes (Optional)
-                                </Text>
-                                <TextInput
-                                    placeholder="Add any notes..."
-                                    placeholderTextColor="#9CA3AF"
-                                    value={notes}
-                                    onChangeText={setNotes}
-                                    multiline
-                                    numberOfLines={3}
-                                    className="bg-surface dark:bg-[#0F172A] border border-divider dark:border-divider-dark rounded-2xl px-4 py-3 text-primary dark:text-primary-dark font-sans text-sm mb-6"
-                                    style={{ minHeight: 80, textAlignVertical: 'top' }}
-                                />
+                                <View className="mt-4 mb-6">
+                                    <Input
+                                        label="Notes (Optional)"
+                                        placeholder="Add any notes..."
+                                        value={notes}
+                                        onChangeText={setNotes}
+                                        multiline
+                                    />
+                                </View>
 
                                 {/* Save Button */}
-                                <TouchableOpacity
+                                <Button
                                     onPress={handleSave}
-                                    disabled={saving}
-                                    activeOpacity={0.85}
-                                    style={{
-                                        backgroundColor: isDark ? '#818CF8' : '#4F46E5',
-                                        borderRadius: 16, height: 52,
-                                        alignItems: 'center', justifyContent: 'center',
-                                        opacity: saving ? 0.6 : 1,
-                                        marginBottom: 8,
-                                    }}
+                                    loading={saving}
+                                    className="mb-8"
                                 >
-                                    {saving ? (
-                                        <ActivityIndicator color="#FFF" />
-                                    ) : (
-                                        <Text style={{
-                                            color: '#FFF', fontFamily: 'PlusJakartaSans_700Bold',
-                                            fontSize: 15,
-                                        }}>Add Expense</Text>
-                                    )}
-                                </TouchableOpacity>
+                                    Add Expense
+                                </Button>
                             </ScrollView>
                         </View>
                     </KeyboardAvoidingView>

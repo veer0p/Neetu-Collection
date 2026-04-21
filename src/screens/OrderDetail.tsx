@@ -54,7 +54,7 @@ export default function OrderDetail({ route, navigation }: any) {
                 const fetchedOrder = await supabaseService.getOrderById(orderId);
                 if (fetchedOrder) setOrder(fetchedOrder);
             }
-            const entries = await supabaseService.getLedgerEntriesByOrder(orderId);
+            const entries = await supabaseService.getV2LedgerByOrder(orderId);
             setLedgerEntries(entries);
         } catch (error) {
             console.error('Error loading order details:', error);

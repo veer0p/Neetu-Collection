@@ -41,16 +41,17 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
         if (!userId) return;
         setLoading(true);
         try {
-            const [directory, transactions, allExpenses] = await Promise.all([
+            const [directory, transactions, allExpenses, profile] = await Promise.all([
                 supabaseService.getDirectoryWithBalances(userId),
                 supabaseService.getTransactions(userId),
                 supabaseService.getExpenses(userId),
+                supabaseService.getProfile(userId),
             ]);
 
+            const receivable = Number(profile?.v2_total_due || 0);
+            const payable = Number(profile?.v2_total_owe || 0);
             const receivableAccounts = directory.filter((a: any) => a.balance > 0);
             const payableAccounts = directory.filter((a: any) => a.balance < 0);
-            const receivable = receivableAccounts.reduce((s: number, a: any) => s + (a.balance || 0), 0);
-            const payable = Math.abs(payableAccounts.reduce((s: number, a: any) => s + (a.balance || 0), 0));
 
             const parseDate = (dateStr: string) => {
                 const parts = dateStr?.split('/');
@@ -248,64 +249,47 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                             </View>
 
                             {/* Quick Stats */}
-                            <View className="flex-row gap-3 mb-4">
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4" contentContainerStyle={{ paddingRight: 20 }}>
                                 <TouchableOpacity
-                                    className="flex-1"
+                                    className="mr-3"
+                                    style={{ width: 160 }}
                                     onPress={() => navigation.navigate('Ledger')}
                                     activeOpacity={0.7}
                                 >
-                                    <Card className="p-4">
-                                        <View className="flex-row items-center mb-2">
-                                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? 'rgba(52,211,153,0.15)' : 'rgba(16,185,129,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                                                <ArrowDownLeft size={16} color={isDark ? '#34D399' : '#10B981'} />
-                                            </View>
-                                        </View>
-                                        <Text className="text-success font-sans-bold text-xl">₹{stats.receivable.toLocaleString()}</Text>
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[11px] mt-1">{stats.receivableCount} people owe you</Text>
+                                    <Card className="p-4 bg-surface dark:bg-surface-dark">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mb-1">To Receive</Text>
+                                        <Text className="text-success font-sans-bold text-xl mb-1">₹{stats.receivable.toLocaleString()}</Text>
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">{stats.receivableCount} clients</Text>
                                     </Card>
                                 </TouchableOpacity>
+                                
                                 <TouchableOpacity
-                                    className="flex-1"
+                                    className="mr-3"
+                                    style={{ width: 160 }}
                                     onPress={() => navigation.navigate('Ledger')}
                                     activeOpacity={0.7}
                                 >
-                                    <Card className="p-4">
-                                        <View className="flex-row items-center mb-2">
-                                            <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: isDark ? 'rgba(248,113,113,0.15)' : 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                                                <ArrowUpRight size={16} color={isDark ? '#F87171' : '#EF4444'} />
-                                            </View>
-                                        </View>
-                                        <Text className="text-danger font-sans-bold text-xl">₹{stats.payable.toLocaleString()}</Text>
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[11px] mt-1">You owe {stats.payableCount} vendors</Text>
+                                    <Card className="p-4 bg-surface dark:bg-surface-dark">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mb-1">To Pay</Text>
+                                        <Text className="text-danger font-sans-bold text-xl mb-1">₹{stats.payable.toLocaleString()}</Text>
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">{stats.payableCount} vendors</Text>
                                     </Card>
                                 </TouchableOpacity>
-                            </View>
 
-                            {/* Net Position */}
-                            <TouchableOpacity onPress={() => navigation.navigate('Ledger')} activeOpacity={0.7}>
-                                <Card className="mb-4 p-4 flex-row items-center justify-between">
-                                    <View className="flex-row items-center">
-                                        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: isDark ? 'rgba(129,140,248,0.15)' : 'rgba(79,70,229,0.1)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                                            <Wallet size={20} color={isDark ? '#818CF8' : '#4F46E5'} />
-                                        </View>
-                                        <View>
-                                            <Text className="text-secondary dark:text-secondary-dark font-sans text-xs">Net Position</Text>
-                                            <Text className={cn(
-                                                "font-sans-bold text-lg",
-                                                stats.netPosition >= 0 ? "text-success" : "text-danger"
-                                            )}>
-                                                ₹{Math.abs(stats.netPosition).toLocaleString()}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View className="flex-row items-center">
-                                        <Text className={cn("font-sans text-xs mr-1", stats.netPosition >= 0 ? "text-success" : "text-danger")}>
-                                            {stats.netPosition >= 0 ? 'Net positive' : 'Net negative'}
+                                <TouchableOpacity
+                                    onPress={() => navigation.navigate('Ledger')}
+                                    activeOpacity={0.7}
+                                    style={{ width: 160 }}
+                                >
+                                    <Card className="p-4 bg-surface dark:bg-surface-dark">
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mb-1">Net Position</Text>
+                                        <Text className={cn("font-sans-bold text-xl mb-1", stats.netPosition >= 0 ? "text-success" : "text-danger")}>
+                                            ₹{Math.abs(stats.netPosition).toLocaleString()}
                                         </Text>
-                                        <ChevronRight size={14} color={isDark ? '#94A3B8' : '#9CA3AF'} />
-                                    </View>
-                                </Card>
-                            </TouchableOpacity>
+                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-[10px]">{stats.netPosition >= 0 ? 'Positive' : 'Negative'}</Text>
+                                    </Card>
+                                </TouchableOpacity>
+                            </ScrollView>
 
                             {/* Alerts */}
                             {stats.alerts.length > 0 && (
@@ -445,7 +429,19 @@ export default function Dashboard({ onLogout, user, navigation }: { onLogout: ()
                             </View>
                         </View>
                     )}
+                
                 </ScrollView>
+                {!loading && (
+                    <TouchableOpacity 
+                        onPress={() => navigation.navigate('Add')}
+                        style={{ elevation: 8, shadowColor: isDark ? '#818CF8' : '#4F46E5', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 10, position: 'absolute', bottom: 24, right: 24, zIndex: 100 }}
+                        className="w-16 h-16 rounded-full bg-accent dark:bg-[#818CF8] items-center justify-center flex-row shadow-xl"
+                        activeOpacity={0.8}
+                    >
+                        <Package size={26} color="#FFFFFF" style={{ marginRight: 2 }} />
+                    </TouchableOpacity>
+                )}
+
             </SafeAreaView>
         </Background>
     );

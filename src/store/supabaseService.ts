@@ -277,6 +277,12 @@ export const supabaseService = {
                 .eq('order_id', savedOrder.id)
                 .not('transaction_type', 'in', '("PaymentIn","PaymentOut","Refund","Recovery","Reversal")');
             if (deleteError) throw deleteError;
+
+            // V2 Accounting: Purge pending 'due' transactions for this order to avoid duplicates on re-save
+            await supabase.from('v2_transactions')
+                .delete()
+                .eq('order_id', savedOrder.id)
+                .eq('type', 'due');
         }
 
         const orderId = savedOrder.id;
@@ -284,6 +290,8 @@ export const supabaseService = {
         const sellingPrice = Number(order.sellingPrice || 0);
         const pickupCharges = Number(order.pickupCharges || 0);
         const shippingCharges = Number(order.shippingCharges || 0);
+        const hasPickupPerson = !!order.pickupPersonId;
+        const paidByDriver = order.paidByDriver || false;
 
         if (isCanceledOrReturned) {
             // Reversal Logic:
@@ -323,97 +331,214 @@ export const supabaseService = {
                     if (revError) throw revError;
                 }
             }
-            return;
-        }
+        } else {
+            const ledgerEntries: any[] = [];
 
-        const ledgerEntries: any[] = [];
-        const hasPickupPerson = !!order.pickupPersonId;
-        const paidByDriver = order.paidByDriver || false;
-
-        ledgerEntries.push({
-            user_id: userId, order_id: orderId, person_id: order.customerId || null,
-            amount: sellingPrice + shippingCharges + pickupCharges, transaction_type: 'Sale', is_settled: false,
-        });
-        ledgerEntries.push({
-            user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-            amount: -originalPrice, transaction_type: 'Purchase', is_settled: false,
-        });
-        if (!hasPickupPerson && shippingCharges > 0) {
+            ledgerEntries.push({
+                user_id: userId, order_id: orderId, person_id: order.customerId || null,
+                amount: sellingPrice + shippingCharges + pickupCharges, transaction_type: 'Sale', is_settled: false,
+            });
             ledgerEntries.push({
                 user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges', is_settled: false,
+                amount: -originalPrice, transaction_type: 'Purchase', is_settled: false,
             });
-        }
-        if (hasPickupPerson && pickupCharges > 0) {
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                amount: -pickupCharges, transaction_type: 'Expense', notes: 'Pickup charges', is_settled: false,
-            });
-        }
-        if (hasPickupPerson && shippingCharges > 0) {
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges', is_settled: false,
-            });
-        }
-        if (paidByDriver && hasPickupPerson) {
-            // Driver paid the vendor directly — mark the vendor's Purchase as settled immediately
-            for (const e of ledgerEntries) {
-                if (e.person_id === order.vendorId && (e.transaction_type === 'Purchase' || (e.transaction_type === 'Expense' && e.notes === 'Shipping charges'))) {
-                    e.is_settled = true;
-                    e.settled_at = new Date().toISOString();
-                }
-            }
-
-            // AND create balancing entry for Vendor so their balance becomes 0
-            // We use 'PaymentOut' because from shop perspective it's a payment made (even though via driver)
-            ledgerEntries.push({
-                user_id: userId, order_id: orderId, person_id: order.vendorId || null,
-                amount: originalPrice, transaction_type: 'PaymentOut',
-                notes: 'Paid by pickup person', is_settled: true,
-                settled_at: new Date().toISOString()
-            });
-
-            // Also record the debt to the Pickup Person (Reimbursement)
-            if (originalPrice > 0) {
+            if (!hasPickupPerson && shippingCharges > 0) {
                 ledgerEntries.push({
-                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
-                    amount: -originalPrice, transaction_type: 'Expense',
-                    notes: 'Product cost (paid by driver)', is_settled: false,
+                    user_id: userId, order_id: orderId, person_id: order.vendorId || null,
+                    amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges', is_settled: false,
                 });
             }
-        }
-        if (order.customerPaymentStatus === 'Paid') {
-            // Mark Sale as settled instead of adding a PaymentIn entry
-            const saleEntry = ledgerEntries.find((e: any) => e.transaction_type === 'Sale' && e.person_id === (order.customerId || null));
-            if (saleEntry) { saleEntry.is_settled = true; saleEntry.settled_at = new Date().toISOString(); }
-        }
-        if (order.vendorPaymentStatus === 'Paid' && !paidByDriver) {
-            // Mark Purchase and Expense (shipping on vendor) as settled instead of adding PaymentOut entries
-            for (const e of ledgerEntries) {
-                if (
-                    e.person_id === (order.vendorId || null) &&
-                    (e.transaction_type === 'Purchase' || e.transaction_type === 'Expense')
-                ) {
-                    e.is_settled = true;
-                    e.settled_at = new Date().toISOString();
+            if (hasPickupPerson && pickupCharges > 0) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
+                    amount: -pickupCharges, transaction_type: 'Expense', notes: 'Pickup charges', is_settled: false,
+                });
+            }
+            if (hasPickupPerson && shippingCharges > 0) {
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
+                    amount: -shippingCharges, transaction_type: 'Expense', notes: 'Shipping charges', is_settled: false,
+                });
+            }
+            if (paidByDriver && hasPickupPerson) {
+                // Driver paid the vendor directly — mark the vendor's Purchase as settled immediately
+                for (const e of ledgerEntries) {
+                    if (e.person_id === order.vendorId && (e.transaction_type === 'Purchase' || (e.transaction_type === 'Expense' && e.notes === 'Shipping charges'))) {
+                        e.is_settled = true;
+                        e.settled_at = new Date().toISOString();
+                    }
+                }
+
+                // AND create balancing entry for Vendor so their balance becomes 0
+                // We use 'PaymentOut' because from shop perspective it's a payment made (even though via driver)
+                ledgerEntries.push({
+                    user_id: userId, order_id: orderId, person_id: order.vendorId || null,
+                    amount: originalPrice, transaction_type: 'PaymentOut',
+                    notes: 'Paid by pickup person', is_settled: true,
+                    settled_at: new Date().toISOString()
+                });
+
+                // Also record the debt to the Pickup Person (Reimbursement)
+                if (originalPrice > 0) {
+                    ledgerEntries.push({
+                        user_id: userId, order_id: orderId, person_id: order.pickupPersonId || null,
+                        amount: -originalPrice, transaction_type: 'Expense',
+                        notes: 'Product cost (paid by driver)', is_settled: false,
+                    });
                 }
             }
-        }
-        if (order.pickupPaymentStatus === 'Paid' && hasPickupPerson) {
-            // Mark ALL Expense entries for pickup person as settled (pickup charges, shipping, and product cost if paidByDriver)
-            for (const e of ledgerEntries) {
-                if (
-                    e.person_id === (order.pickupPersonId || null) &&
-                    e.transaction_type === 'Expense'
-                ) {
-                    e.is_settled = true;
-                    e.settled_at = new Date().toISOString();
+            if (order.customerPaymentStatus === 'Paid') {
+                // Mark Sale as settled instead of adding a PaymentIn entry
+                const saleEntry = ledgerEntries.find((e: any) => e.transaction_type === 'Sale' && e.person_id === (order.customerId || null));
+                if (saleEntry) { saleEntry.is_settled = true; saleEntry.settled_at = new Date().toISOString(); }
+            }
+            if (order.vendorPaymentStatus === 'Paid' && !paidByDriver) {
+                // Mark Purchase and Expense (shipping on vendor) as settled instead of adding PaymentOut entries
+                for (const e of ledgerEntries) {
+                    if (
+                        e.person_id === (order.vendorId || null) &&
+                        (e.transaction_type === 'Purchase' || e.transaction_type === 'Expense')
+                    ) {
+                        e.is_settled = true;
+                        e.settled_at = new Date().toISOString();
+                    }
                 }
             }
+            if (order.pickupPaymentStatus === 'Paid' && hasPickupPerson) {
+                // Mark ALL Expense entries for pickup person as settled (pickup charges, shipping, and product cost if paidByDriver)
+                for (const e of ledgerEntries) {
+                    if (
+                        e.person_id === (order.pickupPersonId || null) &&
+                        e.transaction_type === 'Expense'
+                    ) {
+                        e.is_settled = true;
+                        e.settled_at = new Date().toISOString();
+                    }
+                }
+            }
+            const { error: ledgerError } = await supabase.from('ledger').insert(ledgerEntries);
+            if (ledgerError) throw ledgerError;
         }
-        const { error: ledgerError } = await supabase.from('ledger').insert(ledgerEntries);
-        if (ledgerError) throw ledgerError;
+
+        // === V2 ACCOUNTING INTEGRATION ===
+        // 1. Cleanup old v2 transactions for this order
+        const { error: v2DelError } = await supabase
+            .from('v2_transactions')
+            .delete()
+            .eq('order_id', orderId);
+        if (v2DelError) throw v2DelError;
+
+        // 2. Generate new v2 transactions
+        // If order is Canceled, we don't re-insert, effectively reversing the balance impact.
+        if (order.status !== 'Canceled') {
+            const v2Entries: any[] = [];
+            const commonMetadata = { original_price: originalPrice, selling_price: sellingPrice, product_name: order.productName };
+
+            // Core Sale/Purchase
+            if (order.customerId) {
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.customerId,
+                    amount: sellingPrice + shippingCharges + pickupCharges, type: 'due', direction: 'in',
+                    description: `Sale: ${order.productName}`, payment_for: 'Sale', metadata: commonMetadata
+                });
+            }
+            if (order.vendorId) {
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.vendorId,
+                    amount: originalPrice, type: 'due', direction: 'out',
+                    description: `Purchase: ${order.productName}`, payment_for: 'Purchase', metadata: commonMetadata
+                });
+            }
+
+            // Expenses
+            if (pickupCharges > 0 && order.pickupPersonId) {
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    amount: pickupCharges, type: 'due', direction: 'out',
+                    description: `Pickup: ${order.productName}`, payment_for: 'Expense', metadata: { ...commonMetadata, type: 'Pickup' }
+                });
+            }
+            if (shippingCharges > 0) {
+                const shipPersonId = order.pickupPersonId || order.vendorId;
+                if (shipPersonId) {
+                    v2Entries.push({
+                        user_id: userId, order_id: orderId, person_id: shipPersonId,
+                        amount: shippingCharges, type: 'due', direction: 'out',
+                        description: `Shipping: ${order.productName}`, payment_for: 'Expense', metadata: { ...commonMetadata, type: 'Shipping' }
+                    });
+                }
+            }
+
+            // Settlements
+            if (order.customerPaymentStatus === 'Paid' && order.customerId) {
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.customerId,
+                    amount: sellingPrice + shippingCharges + pickupCharges, type: 'paid', direction: 'in',
+                    description: `Settle Sale: ${order.productName}`, payment_for: 'Payment',
+                    paid_at: new Date().toISOString()
+                });
+            }
+
+            // Driver Paid Logic
+            if (paidByDriver && order.pickupPersonId && order.vendorId) {
+                // Settles vendor purchase
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.vendorId,
+                    amount: originalPrice, type: 'paid', direction: 'out',
+                    description: `Settled by Driver: ${order.productName}`, payment_for: 'Payment',
+                    paid_at: new Date().toISOString()
+                });
+                // Owe driver for the product cost
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                    amount: originalPrice, type: 'due', direction: 'out',
+                    description: `Product Cost Reimb: ${order.productName}`, payment_for: 'Reimbursement'
+                });
+            }
+
+            // Vendor Payment (not driver-paid)
+            if (order.vendorPaymentStatus === 'Paid' && !paidByDriver && order.vendorId) {
+                v2Entries.push({
+                    user_id: userId, order_id: orderId, person_id: order.vendorId,
+                    amount: originalPrice, type: 'paid', direction: 'out',
+                    description: `Settle Purchase: ${order.productName}`, payment_for: 'Payment',
+                    paid_at: new Date().toISOString()
+                });
+            }
+
+            // Pickup/Shipping Settlements
+            if (order.pickupPaymentStatus === 'Paid' && order.pickupPersonId) {
+                if (pickupCharges > 0) {
+                    v2Entries.push({
+                        user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                        amount: pickupCharges, type: 'paid', direction: 'out',
+                        description: `Settle Pickup: ${order.productName}`, payment_for: 'Payment',
+                        paid_at: new Date().toISOString()
+                    });
+                }
+                if (shippingCharges > 0) {
+                    v2Entries.push({
+                        user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                        amount: shippingCharges, type: 'paid', direction: 'out',
+                        description: `Settle Shipping: ${order.productName}`, payment_for: 'Payment',
+                        paid_at: new Date().toISOString()
+                    });
+                }
+                if (paidByDriver) {
+                    v2Entries.push({
+                        user_id: userId, order_id: orderId, person_id: order.pickupPersonId,
+                        amount: originalPrice, type: 'paid', direction: 'out',
+                        description: `Reimbursed Driver: ${order.productName}`, payment_for: 'Payment',
+                        paid_at: new Date().toISOString()
+                    });
+                }
+            }
+
+            if (v2Entries.length > 0) {
+                const { error: v2Error } = await supabase.from('v2_transactions').insert(v2Entries);
+                if (v2Error) throw v2Error;
+            }
+        }
     },
 
     async getLedgerEntries(personId: string): Promise<LedgerEntry[]> {
@@ -458,6 +583,22 @@ export const supabaseService = {
             is_settled: false,
         }]);
         if (error) throw error;
+
+        // --- V2 ACCOUNTING INTEGRATION ---
+        const direction = entry.transactionType === 'PaymentIn' ? 'in' : 'out';
+        const amount = Math.abs(Number(entry.amount));
+
+        await this.addV2Transaction({
+            userId,
+            personId: entry.personId || '',
+            amount,
+            type: 'paid',
+            direction,
+            description: entry.notes || `${entry.transactionType}`,
+            paymentFor: 'Payment',
+            paidAt: new Date().toISOString()
+        });
+
         // Automatically try to settle pending orders with the new balance
         await this.autoSettleEntries(entry.personId || '', userId);
     },
@@ -551,11 +692,25 @@ export const supabaseService = {
         await this.saveOrder({ ...order, status: 'Canceled' }, userId);
 
         if (options.refundFromShop && order.vendorId) {
+            const amount = order.originalPrice;
             await supabase.from('ledger').insert([{
                 user_id: userId, person_id: order.vendorId, order_id: orderId,
-                amount: order.originalPrice, // Recovery of funds from vendor (reduces our debt, so positive)
+                amount: amount, // Recovery of funds from vendor (reduces our debt, so positive)
                 transaction_type: 'PaymentIn', notes: 'Shop Refund (Cancel)'
             }]);
+
+            // V2 Equivalent
+            await this.addV2Transaction({
+                userId,
+                personId: order.vendorId,
+                orderId,
+                amount: Math.abs(amount),
+                type: 'paid',
+                direction: 'in', // Refund from vendor is money IN
+                description: 'Shop Refund (Cancel)',
+                paymentFor: 'Payment',
+                paidAt: new Date().toISOString()
+            });
         }
     },
 
@@ -570,6 +725,18 @@ export const supabaseService = {
                 amount: returnFee, // Fee charged to customer (increases their debt, so positive)
                 transaction_type: 'Expense', notes: 'Order Return Fee'
             }]);
+
+            // V2 Equivalent
+            await this.addV2Transaction({
+                userId,
+                personId: order.customerId || '',
+                orderId,
+                amount: returnFee,
+                type: 'due',
+                direction: 'in', // Fee charged to customer is money due IN
+                description: 'Order Return Fee',
+                paymentFor: 'Expense'
+            });
         }
     },
 
@@ -662,6 +829,18 @@ export const supabaseService = {
                 is_settled: false, // Manual entries are always "unsettled" to maintain balance integrity
             }]);
             if (insertErr) throw insertErr;
+
+            // V2 Accounting: Manual counter-entry sync
+            await this.addV2Transaction({
+                userId,
+                personId: entry.person_id,
+                amount: Math.abs(amount),
+                type: 'paid',
+                direction: amount > 0 ? 'in' : 'out', // Match the positive balancing direction
+                description: 'Quick settle (counter-entry)',
+                paymentFor: 'Payment',
+                paidAt: now
+            });
         } else {
             // Order-linked entry: mark as settled
             const { error: updateErr } = await supabase
@@ -669,6 +848,13 @@ export const supabaseService = {
                 .update({ is_settled: true, settled_at: now })
                 .eq('id', id);
             if (updateErr) throw updateErr;
+
+            // V2 Accounting: Mark corresponding transaction as paid
+            await supabase.from('v2_transactions')
+                .update({ type: 'paid', paid_at: now })
+                .eq('order_id', entry.order_id)
+                .eq('person_id', entry.person_id)
+                .eq('user_id', userId);
         }
     },
 
@@ -695,6 +881,15 @@ export const supabaseService = {
                 .update({ is_settled: true, settled_at: now })
                 .in('id', ids);
             if (error) throw error;
+
+            // V2 Accounting: Mark corresponding transactions as paid
+            // We group by order_id to minimize calls
+            const orderIds = Array.from(new Set(orderLinked.map((e: any) => e.order_id)));
+            await supabase.from('v2_transactions')
+                .update({ type: 'paid', paid_at: now })
+                .in('order_id', orderIds)
+                .eq('person_id', personId)
+                .eq('user_id', userId);
         }
 
         // Manual entries: create a counter balance record
@@ -711,6 +906,18 @@ export const supabaseService = {
                     is_settled: false,
                 }]);
                 if (insertErr) throw insertErr;
+
+                // V2 Accounting: Counter-entry sync
+                await this.addV2Transaction({
+                    userId,
+                    personId,
+                    amount: Math.abs(netAmount),
+                    type: 'paid',
+                    direction: netAmount > 0 ? 'in' : 'out', // Counter-entry mirrors the net balance
+                    description: 'Settlement (counter-entry)',
+                    paymentFor: 'Payment',
+                    paidAt: now
+                });
             }
             // We do NOT mark original manual entries as settled. 
             // They remain in the history as balanced entries.
@@ -719,12 +926,16 @@ export const supabaseService = {
 
     async getDirectoryWithBalances(userId: string): Promise<DirectoryItem[]> {
         const { data: directoryData, error: directoryError } = await supabase
-            .from('directory').select('*, ledger:ledger(amount, is_settled)').eq('user_id', userId).eq('is_active', true);
+            .from('directory')
+            .select('*, v2_ledger:v2_transactions(amount, direction)')
+            .eq('user_id', userId)
+            .eq('is_active', true);
+
         if (directoryError) return [];
         return (directoryData || []).map((item: any) => ({
             ...item,
-            balance: (item.ledger || [])
-                .reduce((acc: number, l: any) => acc + Number(l.amount), 0),
+            balance: (item.v2_ledger || [])
+                .reduce((acc: number, t: any) => t.direction === 'in' ? acc + Number(t.amount) : acc - Number(t.amount), 0),
             createdAt: new Date(item.created_at).getTime(),
             isActive: item.is_active
         })) as DirectoryItem[];
@@ -737,18 +948,18 @@ export const supabaseService = {
             .select('*, customer:directory!customer_id(name), product:directory!product_id(name), vendor:directory!vendor_id(name), pickup_person:directory!pickup_person_id(name)')
             .eq('user_id', userId);
 
-        // 2. Fetch Ledger (Payments/Expenses)
-        const { data: ledger, error: ledgerError } = await supabase
-            .from('ledger')
+        // 2. Fetch V2 Transactions (Manual Entries)
+        const { data: v2Ledger, error: v2Error } = await supabase
+            .from('v2_transactions')
             .select('*, person:directory!person_id(name)')
             .eq('user_id', userId)
-            .is('order_id', null); // Only fetch manual entries to avoid duplicates with order-linked ledger
+            .is('order_id', null); // Only fetch manual entries to avoid duplicates with order listings
 
         if (ordersError) {
             console.error('Error fetching orders for transactions:', ordersError);
         }
-        if (ledgerError) {
-            console.error('Error fetching ledger for transactions:', ledgerError);
+        if (v2Error) {
+            console.error('Error fetching V2 ledger for transactions:', v2Error);
         }
 
         const normalizedOrders: Transaction[] = (orders || []).map((o: any) => {
@@ -782,27 +993,29 @@ export const supabaseService = {
             };
         });
 
-        const normalizedLedger: Transaction[] = (ledger || []).map((l: any) => {
-            // Map transaction_type to Transaction type
+        const normalizedLedger: Transaction[] = (v2Ledger || []).map((l: any) => {
+            // Map transaction mapping to Transaction type
             let type: Transaction['type'] = 'Expense';
-            if (l.transaction_type === 'PaymentIn' || l.transaction_type === 'PaymentOut') {
+            if (l.payment_for === 'Payment') {
                 type = 'Payment';
-            } else if (l.transaction_type === 'Sale') {
+            } else if (l.payment_for === 'Sale') {
                 type = 'Sale';
-            } else if (l.transaction_type === 'Purchase') {
+            } else if (l.payment_for === 'Purchase') {
                 type = 'Purchase';
+            } else if (l.payment_for === 'Reimbursement') {
+                type = 'Reimbursement';
             }
 
             return {
                 id: l.id,
-                date: l.created_at.split('T')[0], // Use creation date for ledger entries
+                date: l.transaction_date,
                 type,
-                customerName: (l.transaction_type === 'PaymentIn' || l.transaction_type === 'PaymentOut') && l.person?.type === 'Customer' ? l.person?.name : undefined,
-                vendorName: (l.transaction_type === 'PaymentIn' || l.transaction_type === 'PaymentOut') && l.person?.type === 'Vendor' ? l.person?.name : undefined,
-                productName: l.notes || 'Manual Entry',
-                amount: Math.abs(Number(l.amount)),
-                notes: l.notes,
-                createdAt: new Date(l.created_at).getTime(),
+                customerName: (type === 'Payment' || type === 'Sale') && l.person?.name ? l.person?.name : undefined,
+                vendorName: (type === 'Payment' || type === 'Purchase') && l.person?.name ? l.person?.name : undefined,
+                productName: l.description || 'Manual Entry',
+                amount: Number(l.amount),
+                notes: l.description,
+                createdAt: new Date(l.transaction_time).getTime(),
             };
         });
 
@@ -1013,12 +1226,33 @@ export const supabaseService = {
             const { error } = await supabase.from('expenses').update(payload).eq('id', expense.id);
             if (error) throw error;
         } else {
-            const { error } = await supabase.from('expenses').insert([payload]);
+            const { data, error } = await supabase.from('expenses').insert([payload]).select().single();
             if (error) throw error;
+            expense.id = data.id;
         }
+
+        // V2 Accounting: Business Expense is a manual "out" payment
+        // Remove existing if update, then re-insert to ensure sync
+        await supabase.from('v2_transactions').delete().eq('expense_id', expense.id);
+
+        await this.addV2Transaction({
+            userId,
+            personId: '', // No specific person for general business expenses
+            amount: Number(expense.amount),
+            type: 'paid',
+            direction: 'out',
+            description: `Expense: ${expense.title}`,
+            paymentFor: 'Expense',
+            expenseId: expense.id,
+            paidAt: new Date().toISOString()
+        });
     },
 
     async deleteExpense(id: string): Promise<void> {
+        // 1. Delete associated V2 transaction first (referential integrity or just cleanup)
+        await supabase.from('v2_transactions').delete().eq('expense_id', id);
+
+        // 2. Delete the expense record
         const { error } = await supabase.from('expenses').delete().eq('id', id);
         if (error) throw error;
     },
@@ -1045,5 +1279,103 @@ export const supabaseService = {
             notes: item.notes,
             createdAt: new Date(item.created_at).getTime(),
         })) as Expense[];
+    },
+
+    // --- Accounting v2 Services ---
+    async addV2Transaction(data: {
+        userId: string,
+        personId: string,
+        amount: number,
+        type: 'paid' | 'due',
+        direction: 'in' | 'out',
+        date?: string,
+        description?: string,
+        paymentFor?: string,
+        orderId?: string,
+        expenseId?: string,
+        paidAt?: string,
+        metadata?: any
+    }) {
+        const { error } = await supabase
+            .from('v2_transactions')
+            .insert([{
+                user_id: data.userId,
+                person_id: data.personId,
+                amount: data.amount,
+                type: data.type,
+                direction: data.direction,
+                transaction_date: data.date || new Date().toISOString().split('T')[0],
+                description: data.description,
+                payment_for: data.paymentFor,
+                order_id: data.orderId,
+                expense_id: data.expenseId,
+                paid_at: data.paidAt,
+                metadata: data.metadata || {}
+            }]);
+        if (error) throw error;
+    },
+
+    async getV2Transactions(userId: string) {
+        const { data, error } = await supabase
+            .from('v2_transactions')
+            .select('*, person:directory!person_id(name)')
+            .eq('user_id', userId)
+            .order('transaction_time', { ascending: false });
+        if (error) throw error;
+        return data;
+    },
+
+    async getV2LedgerByPerson(personId: string): Promise<LedgerEntry[]> {
+        const { data, error } = await supabase
+            .from('v2_transactions')
+            .select('*')
+            .eq('person_id', personId)
+            .order('transaction_time', { ascending: false });
+        if (error) throw error;
+
+        return (data || []).map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            orderId: item.order_id,
+            personId: item.person_id,
+            amount: item.direction === 'in' ? Number(item.amount) : -Number(item.amount),
+            transactionType: (item.payment_for === 'Sale' ? 'Sale' :
+                item.payment_for === 'Purchase' ? 'Purchase' :
+                    item.payment_for === 'Reimbursement' ? 'Reimbursement' :
+                        item.payment_for === 'Expense' ? 'Expense' :
+                            item.direction === 'in' ? 'PaymentIn' : 'PaymentOut') as any,
+            notes: item.description,
+            orderProductName: item.metadata?.product_name,
+            createdAt: new Date(item.transaction_time).getTime(),
+            isSettled: item.type === 'paid',
+            settledAt: item.paid_at ? new Date(item.paid_at).getTime() : undefined,
+        }));
+    },
+
+    async getV2LedgerByOrder(orderId: string): Promise<(LedgerEntry & { personName?: string })[]> {
+        const { data, error } = await supabase
+            .from('v2_transactions')
+            .select('*, person:directory!person_id(name)')
+            .eq('order_id', orderId)
+            .order('transaction_time', { ascending: true });
+        if (error) throw error;
+
+        return (data || []).map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            orderId: item.order_id,
+            personId: item.person_id,
+            personName: item.person?.name,
+            amount: item.direction === 'in' ? Number(item.amount) : -Number(item.amount),
+            transactionType: (item.payment_for === 'Sale' ? 'Sale' :
+                item.payment_for === 'Purchase' ? 'Purchase' :
+                    item.payment_for === 'Reimbursement' ? 'Reimbursement' :
+                        item.payment_for === 'Expense' ? 'Expense' :
+                            item.direction === 'in' ? 'PaymentIn' : 'PaymentOut') as any,
+            notes: item.description,
+            createdAt: new Date(item.transaction_time).getTime(),
+            isSettled: item.type === 'paid',
+            settledAt: item.paid_at ? new Date(item.paid_at).getTime() : undefined,
+        }));
     },
 };

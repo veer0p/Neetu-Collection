@@ -122,6 +122,7 @@ export default function AddEntry({ route, navigation }: any) {
         date: editingOrder?.date || new Date().toLocaleDateString('en-GB') // DD/MM/YYYY
     } : emptyForm);
 
+    const [step, setStep] = useState<1 | 2>(1);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [statusPickerVisible, setStatusPickerVisible] = useState(false);
     const [successDialogVisible, setSuccessDialogVisible] = useState(false);
@@ -383,11 +384,22 @@ export default function AddEntry({ route, navigation }: any) {
         <Background>
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View className="px-6 pt-4 pb-2 flex-row items-center justify-between">
-                    <TouchableOpacity onPress={() => navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl">
+                    <TouchableOpacity onPress={() => step === 2 ? setStep(1) : navigation.goBack()} className="p-2 bg-surface dark:bg-surface-dark rounded-xl">
                         <ChevronLeft color={isDark ? '#818CF8' : '#4F46E5'} size={20} />
                     </TouchableOpacity>
-                    <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{editingOrder ? 'Edit Order' : 'New Order'}</Text>
+                    <View className="items-center">
+                        <Text className="text-primary dark:text-primary-dark font-sans-bold text-xl">{editingOrder ? 'Edit Order' : 'New Order'}</Text>
+                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs mt-1">Step {step} of 2</Text>
+                    </View>
                     <View className="w-10" />
+                </View>
+
+                {/* Progress Bar */}
+                <View className="h-1.5 bg-divider dark:bg-divider-dark mx-6 mt-2 rounded-full overflow-hidden">
+                    <View
+                        className="h-full bg-accent dark:bg-[#818CF8]"
+                        style={{ width: step === 1 ? '50%' : '100%' }}
+                    />
                 </View>
 
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}>
@@ -396,331 +408,339 @@ export default function AddEntry({ route, navigation }: any) {
                         contentContainerStyle={[{ padding: 24, paddingBottom: 150 }, desktopContainerStyle]}
                         keyboardShouldPersistTaps="always"
                     >
-                        {/* Status Selection */}
-                        <Section title="Order Status" icon={Clock} isDark={isDark}>
-                            <TouchableOpacity
-                                onPress={() => setStatusPickerVisible(true)}
-                                className="flex-row items-center justify-between p-4 bg-surface dark:bg-background-dark rounded-2xl border border-divider dark:border-divider-dark"
-                                activeOpacity={0.7}
-                            >
-                                <View className="flex-row items-center">
-                                    <View
-                                        style={{ backgroundColor: getStatusStyle(form.status).bg }}
-                                        className="w-10 h-10 rounded-xl items-center justify-center mr-3"
-                                    >
-                                        <Check size={20} color={getStatusStyle(form.status).color} />
-                                    </View>
-                                    <View>
-                                        <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-tight">Current Status</Text>
-                                        <Text style={{ color: getStatusStyle(form.status).color }} className="font-sans-bold text-lg">
-                                            {form.status}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <ChevronDown size={20} color="#9CA3AF" />
-                            </TouchableOpacity>
-                        </Section>
-
-                        {/* Date Selection */}
-                        <Section title="Order Date" icon={CalendarDays} isDark={isDark}>
-                            {Platform.OS === 'web' ? (
-                                <Input
-                                    label="Date (DD/MM/YYYY)"
-                                    placeholder="DD/MM/YYYY"
-                                    value={form.date}
-                                    onChangeText={(text) => setForm(prev => ({ ...prev, date: text }))}
-                                    leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
-                                />
-                            ) : (
-                                <>
+                        {step === 1 && (
+                            <View className="flex-1">
+                                {/* Status Selection */}
+                                <Section title="Order Status" icon={Clock} isDark={isDark}>
                                     <TouchableOpacity
-                                        onPress={() => setShowDatePicker(true)}
+                                        onPress={() => setStatusPickerVisible(true)}
+                                        className="flex-row items-center justify-between p-4 bg-surface dark:bg-background-dark rounded-2xl border border-divider dark:border-divider-dark"
                                         activeOpacity={0.7}
                                     >
-                                        <View pointerEvents="none">
+                                        <View className="flex-row items-center">
+                                            <View
+                                                style={{ backgroundColor: getStatusStyle(form.status).bg }}
+                                                className="w-10 h-10 rounded-xl items-center justify-center mr-3"
+                                            >
+                                                <Check size={20} color={getStatusStyle(form.status).color} />
+                                            </View>
+                                            <View>
+                                                <Text className="text-secondary dark:text-secondary-dark font-sans text-xs uppercase tracking-tight">Current Status</Text>
+                                                <Text style={{ color: getStatusStyle(form.status).color }} className="font-sans-bold text-lg">
+                                                    {form.status}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <ChevronDown size={20} color="#9CA3AF" />
+                                    </TouchableOpacity>
+                                </Section>
+
+                                {/* Date Selection */}
+                                <Section title="Order Date" icon={CalendarDays} isDark={isDark}>
+                                    {Platform.OS === 'web' ? (
+                                        <Input
+                                            label="Date (DD/MM/YYYY)"
+                                            placeholder="DD/MM/YYYY"
+                                            value={form.date}
+                                            onChangeText={(text) => setForm(prev => ({ ...prev, date: text }))}
+                                            leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
+                                        />
+                                    ) : (
+                                        <>
+                                            <TouchableOpacity
+                                                onPress={() => setShowDatePicker(true)}
+                                                activeOpacity={0.7}
+                                            >
+                                                <View pointerEvents="none">
+                                                    <Input
+                                                        label="Date (DD/MM/YYYY)"
+                                                        placeholder="Select Date"
+                                                        value={form.date}
+                                                        editable={false}
+                                                        leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
+                                                    />
+                                                </View>
+                                            </TouchableOpacity>
+                                            {showDatePicker && (
+                                                <DateTimePicker
+                                                    value={parseDate(form.date)}
+                                                    mode="date"
+                                                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                                    onChange={handleDateChange}
+                                                />
+                                            )}
+                                        </>
+                                    )}
+                                </Section>
+
+                                {/* Product & Parties */}
+                                <Section title="Item & Parties" icon={Package} isDark={isDark} style={{ zIndex: 100 }}>
+                                    <View style={{ zIndex: activeField === 'product' ? 30 : 1 }}>
+                                        <Input
+                                            label="Product Name"
+                                            placeholder="Enter product..."
+                                            value={form.productName}
+                                            onChangeText={text => handleSuggest(text, 'product')}
+                                            onFocus={() => handleFieldFocus('product')}
+                                            leftIcon={<Package size={18} color="#9CA3AF" />}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => customerRef.current?.focus()}
+                                        />
+                                        {renderSuggestions('product')}
+                                    </View>
+
+                                    <View style={{ zIndex: activeField === 'customer' ? 20 : 1 }}>
+                                        <Input
+                                            ref={customerRef}
+                                            label="Customer Name"
+                                            placeholder="Enter customer..."
+                                            value={form.customerName}
+                                            onChangeText={text => handleSuggest(text, 'customer')}
+                                            onFocus={() => handleFieldFocus('customer')}
+                                            leftIcon={<User size={18} color="#9CA3AF" />}
+                                            returnKeyType="next"
+                                            onSubmitEditing={() => vendorRef.current?.focus()}
+                                        />
+                                        {renderSuggestions('customer')}
+                                    </View>
+
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1" style={{ zIndex: activeField === 'vendor' ? 10 : 1 }}>
                                             <Input
-                                                label="Date (DD/MM/YYYY)"
-                                                placeholder="Select Date"
-                                                value={form.date}
-                                                editable={false}
-                                                leftIcon={<CalendarDays size={18} color="#9CA3AF" />}
+                                                ref={vendorRef}
+                                                label="Vendor Name"
+                                                placeholder="Supplier..."
+                                                value={form.vendorName}
+                                                onChangeText={text => handleSuggest(text, 'vendor')}
+                                                onFocus={() => handleFieldFocus('vendor')}
+                                                leftIcon={<ShoppingBag size={18} color="#9CA3AF" />}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => pickupRef.current?.focus()}
+                                            />
+                                            {renderSuggestions('vendor')}
+                                        </View>
+                                        <View className="flex-1" style={{ zIndex: activeField === 'pickup' ? 10 : 1 }}>
+                                            <Input
+                                                ref={pickupRef}
+                                                label="Pickup Person"
+                                                placeholder="Driver..."
+                                                value={form.pickupPersonName}
+                                                onChangeText={text => handleSuggest(text, 'pickup')}
+                                                onFocus={() => handleFieldFocus('pickup')}
+                                                leftIcon={<Truck size={18} color="#9CA3AF" />}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => costPriceRef.current?.focus()}
+                                            />
+                                            {renderSuggestions('pickup')}
+                                        </View>
+                                    </View>
+                                </Section>
+
+                            </View>
+                        )}
+
+                        {step === 2 && (
+                            <View className="flex-1">
+                                {/* Financials */}
+                                <Section title="Financials" icon={IndianRupee} isDark={isDark}>
+                                    <View className="flex-row gap-4 mb-4">
+                                        <View className="flex-[0.5]">
+                                            <Input
+                                                label="Qty"
+                                                placeholder="1"
+                                                keyboardType="numeric"
+                                                value={form.quantity}
+                                                onChangeText={text => {
+                                                    const qty = parseInt(text) || 0;
+                                                    const up = parseFloat(form.unitOriginalPrice) || 0;
+                                                    const sp = parseFloat(form.unitSellingPrice) || 0;
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        quantity: text,
+                                                        originalPrice: (qty * up).toString(),
+                                                        sellingPrice: (qty * sp).toString()
+                                                    }));
+                                                }}
                                             />
                                         </View>
-                                    </TouchableOpacity>
-                                    {showDatePicker && (
-                                        <DateTimePicker
-                                            value={parseDate(form.date)}
-                                            mode="date"
-                                            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                            onChange={handleDateChange}
-                                        />
-                                    )}
-                                </>
-                            )}
-                        </Section>
+                                        <View className="flex-1">
+                                            <Input
+                                                label="Unit Cost"
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={form.unitOriginalPrice}
+                                                onChangeText={text => {
+                                                    const up = parseFloat(text) || 0;
+                                                    const qty = parseInt(form.quantity) || 0;
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        unitOriginalPrice: text,
+                                                        originalPrice: (qty * up).toString()
+                                                    }));
+                                                }}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Input
+                                                label="Unit Sales"
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={form.unitSellingPrice}
+                                                onChangeText={text => {
+                                                    const sp = parseFloat(text) || 0;
+                                                    const qty = parseInt(form.quantity) || 0;
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        unitSellingPrice: text,
+                                                        sellingPrice: (qty * sp).toString()
+                                                    }));
+                                                }}
+                                            />
+                                        </View>
+                                    </View>
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1">
+                                            <Input
+                                                ref={costPriceRef}
+                                                label="Total Cost"
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={form.originalPrice}
+                                                onChangeText={text => {
+                                                    const op = parseFloat(text) || 0;
+                                                    const qty = parseInt(form.quantity) || 1;
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        originalPrice: text,
+                                                        unitOriginalPrice: (op / qty).toFixed(2).toString()
+                                                    }));
+                                                }}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => salePriceRef.current?.focus()}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Input
+                                                ref={salePriceRef}
+                                                label="Total Sales"
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={form.sellingPrice}
+                                                onChangeText={text => {
+                                                    const sp = parseFloat(text) || 0;
+                                                    const qty = parseInt(form.quantity) || 1;
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        sellingPrice: text,
+                                                        unitSellingPrice: (sp / qty).toFixed(2).toString()
+                                                    }));
+                                                }}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => pickupChRef.current?.focus()}
+                                            />
+                                        </View>
+                                    </View>
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1">
+                                            <Input
+                                                ref={pickupChRef}
+                                                label="Pickup Charges"
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={form.pickupCharges}
+                                                onChangeText={text => setForm(prev => ({ ...prev, pickupCharges: text }))}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => shipChRef.current?.focus()}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Input
+                                                ref={shipChRef}
+                                                label="Ship Charges"
+                                                placeholder="0"
+                                                keyboardType="numeric"
+                                                value={form.shippingCharges}
+                                                onChangeText={text => setForm(prev => ({ ...prev, shippingCharges: text }))}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => trackingRef.current?.focus()}
+                                            />
+                                        </View>
+                                    </View>
+                                </Section>
 
-                        {/* Product & Parties */}
-                        <Section title="Item & Parties" icon={Package} isDark={isDark} style={{ zIndex: 100 }}>
-                            <View style={{ zIndex: activeField === 'product' ? 30 : 1 }}>
-                                <Input
-                                    label="Product Name"
-                                    placeholder="Enter product..."
-                                    value={form.productName}
-                                    onChangeText={text => handleSuggest(text, 'product')}
-                                    onFocus={() => handleFieldFocus('product')}
-                                    leftIcon={<Package size={18} color="#9CA3AF" />}
-                                    returnKeyType="next"
-                                    onSubmitEditing={() => customerRef.current?.focus()}
-                                />
-                                {renderSuggestions('product')}
-                            </View>
-
-                            <View style={{ zIndex: activeField === 'customer' ? 20 : 1 }}>
-                                <Input
-                                    ref={customerRef}
-                                    label="Customer Name"
-                                    placeholder="Enter customer..."
-                                    value={form.customerName}
-                                    onChangeText={text => handleSuggest(text, 'customer')}
-                                    onFocus={() => handleFieldFocus('customer')}
-                                    leftIcon={<User size={18} color="#9CA3AF" />}
-                                    returnKeyType="next"
-                                    onSubmitEditing={() => vendorRef.current?.focus()}
-                                />
-                                {renderSuggestions('customer')}
-                            </View>
-
-                            <View className="flex-row gap-4">
-                                <View className="flex-1" style={{ zIndex: activeField === 'vendor' ? 10 : 1 }}>
-                                    <Input
-                                        ref={vendorRef}
-                                        label="Vendor Name"
-                                        placeholder="Supplier..."
-                                        value={form.vendorName}
-                                        onChangeText={text => handleSuggest(text, 'vendor')}
-                                        onFocus={() => handleFieldFocus('vendor')}
-                                        leftIcon={<ShoppingBag size={18} color="#9CA3AF" />}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => pickupRef.current?.focus()}
-                                    />
-                                    {renderSuggestions('vendor')}
-                                </View>
-                                <View className="flex-1" style={{ zIndex: activeField === 'pickup' ? 10 : 1 }}>
-                                    <Input
-                                        ref={pickupRef}
-                                        label="Pickup Person"
-                                        placeholder="Driver..."
-                                        value={form.pickupPersonName}
-                                        onChangeText={text => handleSuggest(text, 'pickup')}
-                                        onFocus={() => handleFieldFocus('pickup')}
-                                        leftIcon={<Truck size={18} color="#9CA3AF" />}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => costPriceRef.current?.focus()}
-                                    />
-                                    {renderSuggestions('pickup')}
-                                </View>
-                            </View>
-                        </Section>
-
-                        {/* Financials */}
-                        <Section title="Financials" icon={IndianRupee} isDark={isDark}>
-                            <View className="flex-row gap-4 mb-4">
-                                <View className="flex-[0.5]">
-                                    <Input
-                                        label="Qty"
-                                        placeholder="1"
-                                        keyboardType="numeric"
-                                        value={form.quantity}
-                                        onChangeText={text => {
-                                            const qty = parseInt(text) || 0;
-                                            const up = parseFloat(form.unitOriginalPrice) || 0;
-                                            const sp = parseFloat(form.unitSellingPrice) || 0;
-                                            setForm(prev => ({
-                                                ...prev,
-                                                quantity: text,
-                                                originalPrice: (qty * up).toString(),
-                                                sellingPrice: (qty * sp).toString()
-                                            }));
-                                        }}
-                                    />
-                                </View>
-                                <View className="flex-1">
-                                    <Input
-                                        label="Unit Cost"
-                                        placeholder="0"
-                                        keyboardType="numeric"
-                                        value={form.unitOriginalPrice}
-                                        onChangeText={text => {
-                                            const up = parseFloat(text) || 0;
-                                            const qty = parseInt(form.quantity) || 0;
-                                            setForm(prev => ({
-                                                ...prev,
-                                                unitOriginalPrice: text,
-                                                originalPrice: (qty * up).toString()
-                                            }));
-                                        }}
-                                    />
-                                </View>
-                                <View className="flex-1">
-                                    <Input
-                                        label="Unit Sales"
-                                        placeholder="0"
-                                        keyboardType="numeric"
-                                        value={form.unitSellingPrice}
-                                        onChangeText={text => {
-                                            const sp = parseFloat(text) || 0;
-                                            const qty = parseInt(form.quantity) || 0;
-                                            setForm(prev => ({
-                                                ...prev,
-                                                unitSellingPrice: text,
-                                                sellingPrice: (qty * sp).toString()
-                                            }));
-                                        }}
-                                    />
-                                </View>
-                            </View>
-                            <View className="flex-row gap-4">
-                                <View className="flex-1">
-                                    <Input
-                                        ref={costPriceRef}
-                                        label="Total Cost"
-                                        placeholder="0"
-                                        keyboardType="numeric"
-                                        value={form.originalPrice}
-                                        onChangeText={text => {
-                                            const op = parseFloat(text) || 0;
-                                            const qty = parseInt(form.quantity) || 1;
-                                            setForm(prev => ({
-                                                ...prev,
-                                                originalPrice: text,
-                                                unitOriginalPrice: (op / qty).toFixed(2).toString()
-                                            }));
-                                        }}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => salePriceRef.current?.focus()}
-                                    />
-                                </View>
-                                <View className="flex-1">
-                                    <Input
-                                        ref={salePriceRef}
-                                        label="Total Sales"
-                                        placeholder="0"
-                                        keyboardType="numeric"
-                                        value={form.sellingPrice}
-                                        onChangeText={text => {
-                                            const sp = parseFloat(text) || 0;
-                                            const qty = parseInt(form.quantity) || 1;
-                                            setForm(prev => ({
-                                                ...prev,
-                                                sellingPrice: text,
-                                                unitSellingPrice: (sp / qty).toFixed(2).toString()
-                                            }));
-                                        }}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => pickupChRef.current?.focus()}
-                                    />
-                                </View>
-                            </View>
-                            <View className="flex-row gap-4">
-                                <View className="flex-1">
-                                    <Input
-                                        ref={pickupChRef}
-                                        label="Pickup Charges"
-                                        placeholder="0"
-                                        keyboardType="numeric"
-                                        value={form.pickupCharges}
-                                        onChangeText={text => setForm(prev => ({ ...prev, pickupCharges: text }))}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => shipChRef.current?.focus()}
-                                    />
-                                </View>
-                                <View className="flex-1">
-                                    <Input
-                                        ref={shipChRef}
-                                        label="Ship Charges"
-                                        placeholder="0"
-                                        keyboardType="numeric"
-                                        value={form.shippingCharges}
-                                        onChangeText={text => setForm(prev => ({ ...prev, shippingCharges: text }))}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => trackingRef.current?.focus()}
-                                    />
-                                </View>
-                            </View>
-                        </Section>
-
-                        {/* Payment Settlement */}
-                        <Section title="Settlement" icon={Check} isDark={isDark}>
-                            <ToggleRow
-                                label="Customer Payment"
-                                value={form.customerPaymentStatus}
-                                options={[
-                                    { label: 'UDHAR', value: 'Udhar', color: 'bg-danger' },
-                                    { label: 'PAID', value: 'Paid', color: 'bg-success' }
-                                ]}
-                                onToggle={v => setForm(prev => ({ ...prev, customerPaymentStatus: v }))}
-                                isDark={isDark}
-                            />
-                            <ToggleRow
-                                label="Vendor Settlement (Purchase)"
-                                value={form.vendorPaymentStatus}
-                                options={[
-                                    { label: 'UDHAR', value: 'Udhar', color: 'bg-danger' },
-                                    { label: 'PAID', value: 'Paid', color: 'bg-success' },
-                                    { label: 'PAID BY PICKUP BOY', value: 'DriverPaid', color: 'bg-blue-500' }
-                                ]}
-                                onToggle={v => setForm(prev => ({ ...prev, vendorPaymentStatus: v }))}
-                                isDark={isDark}
-                            />
-                            {form.pickupPersonName && (
-                                <View className={cn("mt-2 pt-2 border-t", isDark ? "border-divider-dark" : "border-divider")}>
+                                {/* Payment Settlement */}
+                                <Section title="Settlement" icon={Check} isDark={isDark}>
                                     <ToggleRow
-                                        label="Pickup Payment"
-                                        value={form.pickupPaymentStatus}
+                                        label="Customer Payment"
+                                        value={form.customerPaymentStatus}
                                         options={[
                                             { label: 'UDHAR', value: 'Udhar', color: 'bg-danger' },
                                             { label: 'PAID', value: 'Paid', color: 'bg-success' }
                                         ]}
-                                        onToggle={v => setForm(prev => ({ ...prev, pickupPaymentStatus: v }))}
+                                        onToggle={v => setForm(prev => ({ ...prev, customerPaymentStatus: v }))}
                                         isDark={isDark}
                                     />
-                                </View>
-                            )}
-                        </Section>
+                                    <ToggleRow
+                                        label="Vendor Settlement (Purchase)"
+                                        value={form.vendorPaymentStatus}
+                                        options={[
+                                            { label: 'UDHAR', value: 'Udhar', color: 'bg-danger' },
+                                            { label: 'PAID', value: 'Paid', color: 'bg-success' },
+                                            { label: 'PAID BY PICKUP BOY', value: 'DriverPaid', color: 'bg-blue-500' }
+                                        ]}
+                                        onToggle={v => setForm(prev => ({ ...prev, vendorPaymentStatus: v }))}
+                                        isDark={isDark}
+                                    />
+                                    {form.pickupPersonName && (
+                                        <View className={cn("mt-2 pt-2 border-t", isDark ? "border-divider-dark" : "border-divider")}>
+                                            <ToggleRow
+                                                label="Pickup Payment"
+                                                value={form.pickupPaymentStatus}
+                                                options={[
+                                                    { label: 'UDHAR', value: 'Udhar', color: 'bg-danger' },
+                                                    { label: 'PAID', value: 'Paid', color: 'bg-success' }
+                                                ]}
+                                                onToggle={v => setForm(prev => ({ ...prev, pickupPaymentStatus: v }))}
+                                                isDark={isDark}
+                                            />
+                                        </View>
+                                    )}
+                                </Section>
 
-                        {/* Additional Info */}
-                        <Section title="Additional Info" icon={FileText} isDark={isDark}>
-                            <View className="flex-row gap-4">
-                                <View className="flex-1">
+                                {/* Additional Info */}
+                                <Section title="Additional Info" icon={FileText} isDark={isDark}>
+                                    <View className="flex-row gap-4">
+                                        <View className="flex-1">
+                                            <Input
+                                                ref={trackingRef}
+                                                label="Tracking ID"
+                                                placeholder="AWB xxxx"
+                                                value={form.trackingId}
+                                                onChangeText={text => setForm(prev => ({ ...prev, trackingId: text }))}
+                                                returnKeyType="next"
+                                                onSubmitEditing={() => notesRef.current?.focus()}
+                                            />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Input
+                                                label="Courier Name"
+                                                placeholder="Delhivery, Xpressbees..."
+                                                value={form.courierName}
+                                                onChangeText={text => setForm(prev => ({ ...prev, courierName: text }))}
+                                            />
+                                        </View>
+                                    </View>
                                     <Input
-                                        ref={trackingRef}
-                                        label="Tracking ID"
-                                        placeholder="AWB xxxx"
-                                        value={form.trackingId}
-                                        onChangeText={text => setForm(prev => ({ ...prev, trackingId: text }))}
-                                        returnKeyType="next"
-                                        onSubmitEditing={() => notesRef.current?.focus()}
+                                        ref={notesRef}
+                                        label="Notes"
+                                        placeholder="Any extra details..."
+                                        multiline
+                                        value={form.notes}
+                                        onChangeText={text => setForm(prev => ({ ...prev, notes: text }))}
                                     />
-                                </View>
-                                <View className="flex-1">
-                                    <Input
-                                        label="Courier Name"
-                                        placeholder="Delhivery, Xpressbees..."
-                                        value={form.courierName}
-                                        onChangeText={text => setForm(prev => ({ ...prev, courierName: text }))}
-                                    />
-                                </View>
+                                </Section>
                             </View>
-                            <Input
-                                ref={notesRef}
-                                label="Notes"
-                                placeholder="Any extra details..."
-                                multiline
-                                value={form.notes}
-                                onChangeText={text => setForm(prev => ({ ...prev, notes: text }))}
-                            />
-                        </Section>
-
+                        )}
                     </ScrollView>
                 </KeyboardAvoidingView>
 
@@ -732,13 +752,23 @@ export default function AddEntry({ route, navigation }: any) {
                     borderTopWidth: 1,
                     borderTopColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                 }}>
-                    <Button
-                        onPress={handleSave}
-                        disabled={loading || !form.productName || !form.customerName || !form.vendorName}
-                        className="h-14"
-                    >
-                        {loading ? 'Saving...' : 'Save Order'}
-                    </Button>
+                    {step === 1 ? (
+                        <Button
+                            onPress={() => setStep(2)}
+                            disabled={!form.productName || !form.customerName || !form.vendorName}
+                            className="h-14"
+                        >
+                            Next: Financial Details
+                        </Button>
+                    ) : (
+                        <Button
+                            onPress={handleSave}
+                            disabled={loading || !form.productName || !form.customerName || !form.vendorName}
+                            className="h-14"
+                        >
+                            {loading ? 'Saving...' : 'Save Order'}
+                        </Button>
+                    )}
                 </View>
                 <BottomSheetPicker
                     visible={statusPickerVisible}
